@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>ur5_robot_description</name>
+  <version>0.0.0</version>
+  <description>TODO: Package description</description>
+  <maintainer email="dennis.chavezromero@hotmail.com">dennis</maintainer>
+  <license>TODO: License declaration</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <depend>urdf</depend>
+  <depend>xacro</depend>
+  <depend>rviz2</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+    <gazebo_ros>gazebo_model_path = "/home/dennis/ros2_ws/install/ur5_robot_description/share/"</gazebo_ros>
+    <!-- <gazebo_model_path>"/home/dennis/ros2_ws/install/ur5_robot_description/share/"</gazebo_model_path> -->
+    <!-- <gazebo_model_path>$(env GAZEBO_MODEL_PATH):$(prefix)/share/ur5_robot_description/models</gazebo_model_path> -->
+  </export>
+</package>
