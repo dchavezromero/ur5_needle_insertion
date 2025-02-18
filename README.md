@@ -1,6 +1,6 @@
 # UR5 Needle Insertion - ROS 2 Workspace
 
-This repository contains the `ur5_needle_insertion` ROS 2 workspace for UR5 robot-based needle insertion path planning. The workspace includes multiple ROS 2 packages and a **submodule for UR5 description** from the **Universal Robots ROS 2 Description repository**.
+This repository contains the `ur5_needle_insertion` ROS 2 workspace for UR5 robot-based needle insertion path planning. 
 
 ---
 ## **0. Disclosure**
