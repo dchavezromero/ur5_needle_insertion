@@ -1,0 +1,25 @@
+moveit_setup_assistant_config:
+  urdf:
+    package: ur5_robot_description
+    relative_path: urdf/ur5.xacro
+  srdf:
+    relative_path: config/ur5.srdf
+  package_settings:
+    author_name: Dennis Chavez Romero
+    author_email: dchavezromero@wpi.edu
+    generated_timestamp: 1740063718
+  control_xacro:
+    command:
+      - position
+    state:
+      - position
+      - velocity
+  modified_urdf:
+    xacros:
+      - control_xacro
+  control_xacro:
+    command:
+      - position
+    state:
+      - position
+      - velocity
