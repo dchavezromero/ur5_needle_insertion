@@ -14,6 +14,8 @@ Ensure you have the following installed:
 - **Colcon** (for building ROS 2 workspaces)
 - **Gazebo Classic** (for physics simulation) → [Installation Guide](https://classic.gazebosim.org/tutorials?tut=ros2_installing) **Important!!** The instructions here are for ros2 foxy, change every instance of `foxy` to `humble` when executing the commands. 
 - **Git** (for cloning and managing repositories)
+- **MoveIt** (for motion planning) → [Installation Guide](https://moveit.picknik.ai/main/doc/tutorials/getting_started/getting_started.html)
+- **Python 3.10**
 
 ### **Install Required Dependencies**
 ```bash
@@ -64,6 +66,12 @@ cd ~/ros2_ws
 colcon build --symlink-install
 ```
 
+Note that we assume you have already built the `ws_moveit` workspace. If not, please build it first,
+or install it via:
+```bash
+sudo apt install ros-humble-moveit
+```
+
 Source the environment:
 ```bash
 source install/setup.bash
@@ -73,6 +81,10 @@ To **automatically source it in every new terminal**, add it to your `.bashrc`:
 echo "source ~/ros2_ws/install/setup.bash" >> ~/.bashrc
 source ~/.bashrc
 ```
+
+You may also want to source your ros humble and moveit install setup files:
+echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc
+echo "source ~/ws_moveit/install/setup.bash" >> ~/.bashrc
 
 ---
 
@@ -96,6 +108,11 @@ ros2 launch ur5_robot_description ur5_rviz.launch.py
 To launch the UR5 robot in Gazebo Classic:
 ```bash
 ros2 launch ur5_robot_description ur5_gazebo.launch.py
+```
+
+To launch the UR5 robot with MoveIt:
+```bash
+ros2 launch ur5_robot_description ur5_moveit.launch.py
 ```
 ---
 
