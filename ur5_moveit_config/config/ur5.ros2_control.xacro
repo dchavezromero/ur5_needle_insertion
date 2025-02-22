@@ -5,7 +5,6 @@
 
         <ros2_control name="GazeboSimSystem" type="system">
             <hardware>
-                <!-- By default, set up controllers for simulation. This won't work on real hardware -->
                 <plugin>gazebo_ros2_control/GazeboSystem</plugin>
             </hardware>
             <joint name="shoulder_pan_joint">

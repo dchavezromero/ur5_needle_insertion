@@ -34,16 +34,16 @@ def generate_launch_description():
     use_sim_time = {"use_sim_time": True}
     config_dict = moveit_config.to_dict()
     config_dict.update(use_sim_time)
+
     run_move_group_node = Node(
         package="moveit_ros_move_group",
         executable="move_group",
         output="screen",
-        parameters=[moveit_config.to_dict()],
+        parameters=[config_dict],
     )
     # RViz
     rviz_base = os.path.join(os.path.join(get_package_share_directory("ur5_robot_description"), "rviz"))
     rviz_empty_config = os.path.join(rviz_base, "moveit.rviz")
-     # Launch RViz
     rviz_node = Node(
         package="rviz2",
         executable="rviz2",
@@ -77,9 +77,9 @@ def generate_launch_description():
     )
 
     ros2_controllers_path = os.path.join(
-    get_package_share_directory("ur5_moveit_config"),
+    get_package_share_directory("ur5_robot_description"),
     "config",
-    "ros2_controllers.yaml",
+    "ur5_controllers.yaml",
     )
     ros2_control_node = Node(
         package="controller_manager",
@@ -104,14 +104,14 @@ def generate_launch_description():
     arm_controller_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["joint_trajectory_controller", "-c", "/controller_manager"],
+        arguments=["ur5_arm_controller", "-c", "/controller_manager"],
     )
 
-    hand_controller_spawner = Node(
-        package="controller_manager",
-        executable="spawner",
-        arguments=["robotiq_gripper_controller", "-c", "/controller_manager"],
-    )
+    # hand_controller_spawner = Node(
+    #     package="controller_manager",
+    #     executable="spawner",
+    #     arguments=["robotiq_gripper_controller", "-c", "/controller_manager"],
+    # )
     load_joint_state_controller = ExecuteProcess(
         cmd=['ros2', 'control', 'load_controller', '--set-state', 'active',
              'joint_state_broadcaster'],
@@ -119,7 +119,7 @@ def generate_launch_description():
     )
 
     load_arm_controller = ExecuteProcess(
-        cmd=['ros2', 'control', 'load_controller', '--set-state', 'active', 'arm_controller'],
+        cmd=['ros2', 'control', 'load_controller', '--set-state', 'active', 'ur5_arm_controller'],
             output='screen'
     )
     
@@ -130,28 +130,28 @@ def generate_launch_description():
                         
 
     return LaunchDescription([
-        RegisterEventHandler(
-            event_handler=OnProcessExit(
-            target_action=spawn_entity,
-            on_exit=[load_joint_state_controller],
-            )
-        ),
+        # RegisterEventHandler(
+        #     event_handler=OnProcessExit(
+        #     target_action=spawn_entity,
+        #     on_exit=[load_joint_state_controller],
+        #     )
+        # ),
 
-        RegisterEventHandler(
-            event_handler=OnProcessExit(
-                target_action=load_joint_state_controller,
-                on_exit=[load_arm_controller],
-            )
-        ),
+        # RegisterEventHandler(
+        #     event_handler=OnProcessExit(
+        #         target_action=load_joint_state_controller,
+        #         on_exit=[load_arm_controller],
+        #     )
+        # ),
             gazebo,
             robot_state_publisher,
             spawn_entity,
             rviz_node,
             static_tf,
             run_move_group_node,
-            # ros2_control_node,
-            # joint_state_broadcaster_spawner,
-            # arm_controller_spawner,
+            ros2_control_node,
+            joint_state_broadcaster_spawner,
+            arm_controller_spawner,
             # hand_controller_spawner,
         ])
 
