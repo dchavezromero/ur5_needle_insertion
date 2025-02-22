@@ -314,7 +314,7 @@
   <link name="needle">
     <visual>
       <geometry>
-        <cylinder length="0.15" radius="0.002"/>
+        <cylinder length="0.10" radius="0.001"/>
       </geometry>
       <material name="metal">
         <color rgba="0.8 0.8 0.8 1"/>
@@ -327,7 +327,7 @@
     </collision>
     <inertial>
       <mass value="0.005"/>
-      <origin xyz="0 0 0.075"/>
+      <origin xyz="0 0 0"/>
       <inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/>
     </inertial>
   </link>
@@ -335,7 +335,7 @@
   <joint name="needle_fixed_joint" type="fixed">
     <parent link="tool0"/>
     <child link="needle"/>
-    <origin xyz="0 0 0.08" rpy="0 0 0"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
   </joint>
 
 
