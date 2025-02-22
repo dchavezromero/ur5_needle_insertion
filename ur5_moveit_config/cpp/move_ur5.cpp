@@ -15,7 +15,7 @@ int main(int argc, char* argv[])
 
   // Create the MoveIt MoveGroup Interface
   using moveit::planning_interface::MoveGroupInterface;
-  auto move_group_interface = MoveGroupInterface(node, "arm");
+  auto move_group_interface = MoveGroupInterface(node, "ur5_arm");
 
   // Set a target Pose
   auto const target_pose = [] {
