@@ -7,7 +7,7 @@ moveit_setup_assistant_config:
   package_settings:
     author_name: Dennis Chavez Romero
     author_email: dchavezromero@wpi.edu
-    generated_timestamp: 1740076222
+    generated_timestamp: 1740177432
   control_xacro:
     command:
       - position
