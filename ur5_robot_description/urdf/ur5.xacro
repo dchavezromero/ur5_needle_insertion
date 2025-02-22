@@ -173,7 +173,27 @@
     </inertial>
   </link>
   <link name="flange"/>
-  <link name="tool0"/>
+
+  <link name="needle">
+    <visual>
+      <geometry>
+        <cylinder length="0.10" radius="0.001"/>
+      </geometry>
+      <material name="metal">
+        <color rgba="0.8 0.8 0.8 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <cylinder length="0.15" radius="0.002"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.005"/>
+      <origin xyz="0 0 0"/>
+      <inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/>
+    </inertial>
+  </link>
 
   <joint name="world-base_link_fixed_joint" type="fixed">
     <origin rpy="0 0 0" xyz="0 0 0"/>
@@ -246,10 +266,11 @@
     <child link="flange"/>
     <origin rpy="0 -1.5707963267948966 -1.5707963267948966" xyz="0 0 0"/>
   </joint>
+  
   <joint name="flange-tool0" type="fixed">
     <origin rpy="1.5707963267948966 0 1.5707963267948966" xyz="0 0 0"/>
     <parent link="flange"/>
-    <child link="tool0"/>
+    <child link="needle"/>
   </joint>
 
   <ros2_control name="GazeboSimSystem" type="system">
@@ -310,33 +331,5 @@
       <parameters>$(find ur5_robot_description)/config/ur5_controllers.yaml</parameters>
     </plugin>
   </gazebo>
-
-  <link name="needle">
-    <visual>
-      <geometry>
-        <cylinder length="0.10" radius="0.001"/>
-      </geometry>
-      <material name="metal">
-        <color rgba="0.8 0.8 0.8 1"/>
-      </material>
-    </visual>
-    <collision>
-      <geometry>
-        <cylinder length="0.15" radius="0.002"/>
-      </geometry>
-    </collision>
-    <inertial>
-      <mass value="0.005"/>
-      <origin xyz="0 0 0"/>
-      <inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/>
-    </inertial>
-  </link>
-
-  <joint name="needle_fixed_joint" type="fixed">
-    <parent link="tool0"/>
-    <child link="needle"/>
-    <origin xyz="0 0 0" rpy="0 0 0"/>
-  </joint>
-
 
 </robot>
