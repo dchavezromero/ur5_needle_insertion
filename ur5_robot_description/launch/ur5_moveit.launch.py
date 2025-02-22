@@ -14,11 +14,13 @@ import xacro
 from moveit_configs_utils import MoveItConfigsBuilder
 
 def generate_launch_description():
+    world_file = os.path.join(get_package_share_directory('ur5_robot_description'), 'worlds', 'surgical_world.world')
+
     gazebo = IncludeLaunchDescription(
                 PythonLaunchDescriptionSource([os.path.join(
                     get_package_share_directory('gazebo_ros'), 'launch'), '/gazebo.launch.py']),
+                launch_arguments={'world': world_file}.items(),
     )
-        
     moveit_config = (
         MoveItConfigsBuilder("ur5")
         .robot_description(file_path="config/ur5.urdf.xacro")

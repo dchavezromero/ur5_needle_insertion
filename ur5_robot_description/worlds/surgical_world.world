@@ -1,0 +1,37 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+  <world name="surgical_world">
+    <!-- Load the default physics engine -->
+    <physics type="ode">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+      <real_time_update_rate>1000.0</real_time_update_rate>
+    </physics>
+
+    <!-- Set ambient light -->
+    <scene>
+      <ambient>0.5 0.5 0.5 1</ambient>
+    </scene>
+
+    <!-- Ground Plane -->
+    <include>
+      <uri>model://ground_plane</uri>
+    </include>
+
+    <!-- Add a light source -->
+    <include>
+      <uri>model://sun</uri>
+    </include>
+
+    <include>
+        <uri>model://ElderMalePatient</uri>
+        <pose>-1 1 0 0 0 0</pose>  <!-- X, Y, Z position -->
+    </include>
+
+    <include>
+        <uri>model://BedTable</uri>
+        <pose>1.5 1 -0.05 0 0 0</pose>  <!-- X, Y, Z position -->
+    </include>
+
+  </world>
+</sdf>
