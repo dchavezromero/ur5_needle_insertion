@@ -34,11 +34,12 @@ def generate_launch_description():
     use_sim_time = {"use_sim_time": True}
     config_dict = moveit_config.to_dict()
     config_dict.update(use_sim_time)
+
     run_move_group_node = Node(
         package="moveit_ros_move_group",
         executable="move_group",
         output="screen",
-        parameters=[moveit_config.to_dict()],
+        parameters=[config_dict],
     )
     # RViz
     rviz_base = os.path.join(os.path.join(get_package_share_directory("ur5_robot_description"), "rviz"))
@@ -103,7 +104,7 @@ def generate_launch_description():
     arm_controller_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["joint_trajectory_controller", "-c", "/controller_manager"],
+        arguments=["ur5_arm_controller", "-c", "/controller_manager"],
     )
 
     # hand_controller_spawner = Node(
