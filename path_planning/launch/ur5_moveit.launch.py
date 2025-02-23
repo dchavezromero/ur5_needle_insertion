@@ -14,7 +14,7 @@ import xacro
 from moveit_configs_utils import MoveItConfigsBuilder
 
 def generate_launch_description():
-    world_file = os.path.join(get_package_share_directory('path_planning'), 'worlds', 'surgical_world.world')
+    world_file = os.path.join(get_package_share_directory('path_planning'), 'worlds', 'empty.world')
 
     gazebo = IncludeLaunchDescription(
                 PythonLaunchDescriptionSource([os.path.join(
@@ -125,11 +125,67 @@ def generate_launch_description():
             output='screen'
     )
     
-    spawn_entity = Node(package='gazebo_ros', executable='spawn_entity.py',
-                        arguments=['-topic', '/robot_description',
-                                   '-entity', 'ur5'],
-                        output='screen')
-                        
+    # Spawn the Table in Gazebo
+    spawn_table = Node(
+        package='gazebo_ros',
+        executable='spawn_entity.py',
+        arguments=[
+            '-file', os.path.join(get_package_share_directory("hospital_models"), "models/BedsideTable/model.sdf"),
+            '-entity', 'bedsideTable',
+            '-x', '0', '-y', '0', '-z', '0'
+        ],
+        output='screen'
+    )
+
+    spawn_patient = Node(
+        package='gazebo_ros',
+        executable='spawn_entity.py',
+        arguments=[
+            '-file', os.path.join(get_package_share_directory("hospital_models"), "models/ElderMalePatient/model.sdf"),
+            '-entity', 'elderMalePatient',
+            '-x', '0.84', '-y', '0', '-z', '0',
+            '-Y', '-1.57'  # Apply a -1.57 radian yaw rotation
+        ],
+        output='screen'
+    )
+
+    spawn_side_table = Node(
+        package='gazebo_ros',
+        executable='spawn_entity.py',
+        arguments=[
+            '-file', os.path.join(get_package_share_directory("hospital_models"), "models/BedTable/model.sdf"),
+            '-entity', 'bedTable',
+            '-x', '0.855', '-y', '-1.383', '-z', '0'
+        ],
+        output='screen'
+    )
+
+    spawn_surgeon = Node(
+        package='gazebo_ros',
+        executable='spawn_entity.py',
+        arguments=[
+            '-file', os.path.join(get_package_share_directory("hospital_models"), "models/OpScrubs/model.sdf"),
+            '-entity', 'opScrubs',
+            '-x', '0.127641', '-y', '-0.716872', '-z', '0'
+        ],
+        output='screen'
+    )
+    # spawn_entity = Node(package='gazebo_ros', executable='spawn_entity.py',
+    #                     arguments=['-topic', '/robot_description',
+    #                                '-entity', 'ur5'],
+    #                     output='screen')
+
+   # Spawn the UR5 on top of the table
+    spawn_ur5 = Node(
+        package='gazebo_ros',
+        executable='spawn_entity.py',
+        arguments=[
+            '-topic', '/robot_description',
+            '-entity', 'ur5',
+            '-x', '0', '-y', '0', '-z', '0.895'  # Adjust based on table height
+        ],
+        output='screen'
+    )
 
     return LaunchDescription([
         # RegisterEventHandler(
@@ -147,7 +203,11 @@ def generate_launch_description():
         # ),
             gazebo,
             robot_state_publisher,
-            spawn_entity,
+            spawn_table,
+            spawn_ur5,
+            spawn_patient,
+            spawn_surgeon,
+            spawn_side_table,
             rviz_node,
             static_tf,
             run_move_group_node,

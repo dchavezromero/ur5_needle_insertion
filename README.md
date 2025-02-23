@@ -39,7 +39,7 @@ cd ~/ros2_ws
 ### **Clone This Repository**
 ```bash
 cd ~/ros2_ws/src
-git clone --recurse-submodules git@github.com:<your-username>/ur5_needle_insertion.git
+git clone --recurse-submodules git@github.com:dchavezromero/ur5_needle_insertion.git
 cd ur5_needle_insertion
 ```
 
