@@ -33,5 +33,10 @@
         <pose>1.5 1 -0.05 0 0 0</pose>  <!-- X, Y, Z position -->
     </include>
 
+    <include>
+        <uri>model://BedsideTable</uri>
+        <pose>2 1 -0.05 0 0 0</pose>  <!-- X, Y, Z position -->
+    </include>
+
   </world>
 </sdf>

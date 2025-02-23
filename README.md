@@ -91,11 +91,10 @@ echo "source ~/ws_moveit/install/setup.bash" >> ~/.bashrc
 ## **5. UR5 Robot Model Setup**
 This repository includes the **Universal Robots ROS 2 description package** as a **submodule**:
 
-- **Submodule Repositories:** [`Universal_Robots_ROS2_Description`](https://github.com/UniversalRobots/Universal_Robots_ROS2_Description)[`gazebo_ros2_control`](https://github.com/ros-controls/gazebo_ros2_control/tree/humble)
+- **Submodule Repositories:** [`gazebo_ros2_control`](https://github.com/ros-controls/gazebo_ros2_control/tree/humble)
 - **Paths in Workspace:** `~/ros2_ws/src/ur5_needle_insertion/Universal_Robots_ROS2_Description` & `~/ros2_ws/src/ur5_needle_insertion/gazebo_ros2_control`
 
 The `gazebo_ros2_control` package provides us the necessary hardware plugins and controllers for the UR5 arm to use within classical gazebo. 
-The `Universal_Robots_ROS2_Description` will be deleted at a later time.
 
 ---
 
@@ -112,7 +111,7 @@ ros2 launch ur5_robot_description ur5_gazebo.launch.py
 
 To launch the UR5 robot with MoveIt:
 ```bash
-ros2 launch ur5_robot_description ur5_moveit.launch.py
+ros2 launch path_planning ur5_moveit.launch.py
 ```
 ---
 

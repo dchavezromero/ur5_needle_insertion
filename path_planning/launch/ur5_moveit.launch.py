@@ -14,12 +14,12 @@ import xacro
 from moveit_configs_utils import MoveItConfigsBuilder
 
 def generate_launch_description():
-    world_file = os.path.join(get_package_share_directory('ur5_robot_description'), 'worlds', 'surgical_world.world')
+    world_file = os.path.join(get_package_share_directory('path_planning'), 'worlds', 'surgical_world.world')
 
     gazebo = IncludeLaunchDescription(
                 PythonLaunchDescriptionSource([os.path.join(
                     get_package_share_directory('gazebo_ros'), 'launch'), '/gazebo.launch.py']),
-                launch_arguments={'world': world_file}.items(),
+                    launch_arguments={'world': world_file}.items(),
     )
     moveit_config = (
         MoveItConfigsBuilder("ur5")
@@ -44,7 +44,7 @@ def generate_launch_description():
         parameters=[config_dict],
     )
     # RViz
-    rviz_base = os.path.join(os.path.join(get_package_share_directory("ur5_robot_description"), "rviz"))
+    rviz_base = os.path.join(os.path.join(get_package_share_directory("ur5_moveit_config"), "config"))
     rviz_empty_config = os.path.join(rviz_base, "moveit.rviz")
     rviz_node = Node(
         package="rviz2",

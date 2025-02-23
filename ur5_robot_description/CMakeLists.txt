@@ -11,7 +11,7 @@ find_package(urdf REQUIRED)
 find_package(xacro REQUIRED)
 
 # # Install urdf/xacro files
-install(DIRECTORY launch meshes config urdf rviz worlds
+install(DIRECTORY launch meshes config urdf rviz
   DESTINATION share/${PROJECT_NAME})
 # install(DIRECTORY urdf/
 #   DESTINATION share/${PROJECT_NAME}/urdf
