@@ -1,6 +1,21 @@
 <?xml version="1.0" ?>
-<sdf version="1.5">
+<sdf version="1.5" xmlns:xacro="http://ros.org/wiki/xacro">
   <model name="ElderMalePatient">
+    <xacro:macro name="cylinder_inertia" params="m r h">
+      <inertial>
+        <pose>0 0 0 ${pi/2} 0 0</pose>
+        <mass>${m}</mass>
+        <inertia>
+          <ixx>${(m/12) * (3*r*r + h*h)}</ixx>
+          <ixy>0.0</ixy>
+          <ixz>0.0</ixz>
+          <iyy>${(m/12) * (3*r*r + h*h)}</iyy>
+          <iyz>0.0</iyz>
+          <izz>${(m/2) * (r*r)}</izz>
+        </inertia>
+      </inertial>
+    </xacro:macro>
+
     <link name="link">
       <pose>0 0 0 0 0 0</pose>
 
@@ -17,5 +32,241 @@
         </collision>
 
     </link>
+
+    <link name="neck1_insertion_point">
+      <pose>-0.55 -0.05 0.95 1.57 0 0</pose>
+
+      <visual name="visual">
+        <geometry>
+          <mesh><uri>model://ElderMalePatient/meshes/Needle_Tube.stl</uri></mesh>
+        </geometry>
+      </visual>
+
+      <collision name="collision">
+        <geometry>
+          <mesh><uri>model://ElderMalePatient/meshes/Needle_Tube.stl</uri></mesh>
+        </geometry>
+      </collision>
+    </link>
+
+    <joint name="neck1_insertion_point_joint" type="fixed">
+      <parent>link</parent>
+      <child>neck1_insertion_point</child>
+      <pose>0 0 0 0 0 0</pose>
+    </joint>
+
+    <link name="neck2_insertion_point">
+      <pose>-0.55 0.075 0.95 1.57 0 0</pose>
+
+      <visual name="visual">
+        <geometry>
+          <mesh><uri>model://ElderMalePatient/meshes/Needle_Tube.stl</uri></mesh>
+        </geometry>
+      </visual>
+
+      <collision name="collision">
+        <geometry>
+          <mesh><uri>model://ElderMalePatient/meshes/Needle_Tube.stl</uri></mesh>
+        </geometry>
+      </collision>
+    </link>
+
+    <joint name="neck2_insertion_point_joint" type="fixed">
+      <parent>link</parent>
+      <child>neck2_insertion_point</child>
+      <pose>0 0 0 0 0 0</pose>
+    </joint>
+
+    <link name="arm_insertion_point">
+      <pose>-0.4 -0.35 0.85 1.57 0 0</pose>
+
+      <visual name="visual">
+        <geometry>
+          <mesh><uri>model://ElderMalePatient/meshes/Needle_Tube.stl</uri></mesh>
+        </geometry>
+      </visual>
+
+      <collision name="collision">
+        <geometry>
+          <mesh><uri>model://ElderMalePatient/meshes/Needle_Tube.stl</uri></mesh>
+        </geometry>
+      </collision>
+    </link>
+
+    <joint name="arm_insertion_point_joint" type="fixed">
+      <parent>link</parent>
+      <child>arm_insertion_point</child>
+      <pose>0 0 0 0 0 0</pose>
+    </joint>
+
+    <link name="leg_insertion_point">
+      <pose>0.45 0.05 1.0 0 0</pose>
+
+      <visual name="visual">
+        <geometry>
+          <mesh><uri>model://ElderMalePatient/meshes/Needle_Tube.stl</uri></mesh>
+        </geometry>
+      </visual>
+
+      <collision name="collision">
+        <geometry>
+          <mesh><uri>model://ElderMalePatient/meshes/Needle_Tube.stl</uri></mesh>
+        </geometry>
+      </collision>
+    </link>
+
+    <joint name="leg_insertion_point_joint" type="fixed">
+      <parent>link</parent>
+      <child>leg_insertion_point</child>
+      <pose>0 0 0 0 0 0</pose>
+    </joint>
+
+    <link name="divider">
+      <pose>0 0 0 0 0 1.57</pose>
+
+      <visual name="visual">
+        <geometry>
+          <mesh><uri>model://ElderMalePatient/meshes/Divider.stl</uri></mesh>
+        </geometry>
+      </visual>
+
+      <collision name="collision">
+        <geometry>
+          <mesh><uri>model://ElderMalePatient/meshes/Divider.stl</uri></mesh>
+        </geometry>
+      </collision>
+    </link>
+
+    <joint name="leg_insertion_point_joint" type="fixed">
+      <parent>link</parent>
+      <child>leg_insertion_point</child>
+      <pose>0 0 0 0 0 0</pose>
+    </joint>
+
+    <!--
+    <link name="neck1_insertion_point">
+      <pose>-0.55 -0.05 0.95 1.57 0 0</pose>
+
+      <visual name="visual">
+        <geometry>
+          <cylinder>
+            <radius>0.0015</radius>
+            <length>0.05</length>
+          </cylinder>
+        </geometry>
+      </visual>
+
+      <collision name="collision">
+        <geometry>
+          <cylinder>
+            <radius>0.0015</radius>
+            <length>0.125</length>
+          </cylinder>
+        </geometry>
+      </collision>
+
+      <xacro:cylinder_inertia m="0.5" r="0.0015" h="0.125"/>
+        
+    </link>
+
+    <joint name="neck1_insertion_point_joint" type="fixed">
+      <parent>link</parent>
+      <child>neck1_insertion_point</child>
+      <pose>0 0 0 0 0 0</pose>
+    </joint>
+
+    <link name="neck2_insertion_point">
+      <pose>-0.55 0.075 0.95 1.57 0 0</pose>
+
+      <visual name="visual">
+        <geometry>
+          <cylinder>
+            <radius>0.0015</radius>
+            <length>0.05</length>
+          </cylinder>
+        </geometry>
+      </visual>
+
+      <collision name="collision">
+        <geometry>
+          <cylinder>
+            <radius>0.0015</radius>
+            <length>0.125</length>
+          </cylinder>
+        </geometry>
+      </collision>
+
+      <xacro:cylinder_inertia m="0.5" r="0.0015" h="0.125"/>
+        
+    </link>
+
+    <joint name="neck2_insertion_point_joint" type="fixed">
+      <parent>link</parent>
+      <child>neck2_insertion_point</child>
+      <pose>0 0 0 0 0 0</pose>
+    </joint>
+
+    <link name="arm_insertion_point">
+      <pose>-0.4 -0.35 0.85 1.57 0 0</pose>
+
+      <visual name="visual">
+        <geometry>
+          <cylinder>
+            <radius>0.0015</radius>
+            <length>0.05</length>
+          </cylinder>
+        </geometry>
+      </visual>
+
+      <collision name="collision">
+        <geometry>
+          <cylinder>
+            <radius>0.0015</radius>
+            <length>0.125</length>
+          </cylinder>
+        </geometry>
+      </collision>
+
+      <xacro:cylinder_inertia m="0.5" r="0.0015" h="0.125"/>
+        
+    </link>
+
+    <joint name="arm_insertion_point_joint" type="fixed">
+      <parent>link</parent>
+      <child>arm_insertion_point</child>
+      <pose>0 0 0 0 0 0</pose>
+    </joint>
+
+    <link name="leg_insertion_point">
+      <pose>0.45 0.05 1.0 0 0</pose>
+
+      <visual name="visual">
+        <geometry>
+          <cylinder>
+            <radius>0.0015</radius>
+            <length>0.05</length>
+          </cylinder>
+        </geometry>
+      </visual>
+
+      <collision name="collision">
+        <geometry>
+          <cylinder>
+            <radius>0.0015</radius>
+            <length>0.125</length>
+          </cylinder>
+        </geometry>
+      </collision>
+
+      <xacro:cylinder_inertia m="0.5" r="0.0015" h="0.125"/>
+        
+    </link>
+
+    <joint name="leg_insertion_point_joint" type="fixed">
+      <parent>link</parent>
+      <child>leg_insertion_point</child>
+      <pose>0 0 0 0 0 0</pose>
+    </joint>
+    -->
   </model>
 </sdf>

@@ -143,7 +143,7 @@ def generate_launch_description():
         arguments=[
             '-file', os.path.join(get_package_share_directory("hospital_models"), "models/ElderMalePatient/model.sdf"),
             '-entity', 'elderMalePatient',
-            '-x', '0.84', '-y', '0', '-z', '0',
+            '-x', '0.94', '-y', '0', '-z', '0',
             '-Y', '-1.57'  # Apply a -1.57 radian yaw rotation
         ],
         output='screen'
