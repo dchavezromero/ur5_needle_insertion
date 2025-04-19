@@ -1,8 +1,53 @@
+// imports
 #include <memory>
-
 #include <rclcpp/rclcpp.hpp>
 #include <moveit/move_group_interface/move_group_interface.h>
-#include <moveit/planning_scene_interface/planning_scene_interface.h>
+#include <fstream>
+#include <chrono>
+#include <iomanip>
+#include <sstream>
+#include <filesystem>
+
+// get current timestamp for filename
+std::string getCurrentTimestamp() {
+    auto now = std::chrono::system_clock::now();
+    auto now_c = std::chrono::system_clock::to_time_t(now);
+    std::stringstream ss;
+    ss << std::put_time(std::localtime(&now_c), "%Y%m%d_%H%M%S");
+    return ss.str();
+}
+
+// function to save trajectory data to CSV (if we want to compare different planners)
+void saveTrajectoryToCSV(const moveit_msgs::msg::RobotTrajectory& trajectory,
+                        const std::string& planner_name,
+                        const rclcpp::Logger& logger) {
+    std::string timestamp = getCurrentTimestamp();
+    std::string filename = "trajectory_" + planner_name + "_" + timestamp + ".csv";
+    
+    std::ofstream csv_file(filename);
+    if (!csv_file.is_open()) {
+        RCLCPP_ERROR(logger, "Failed to open file for writing: %s", filename.c_str());
+        return;
+    }
+
+    // write header (hard-coded for now)
+    csv_file << "time,elbow_joint,shoulder_lift_joint,shoulder_pan_joint,wrist_1_joint,wrist_2_joint,wrist_3_joint\n";
+
+    // write trajectory points
+    for (size_t i = 0; i < trajectory.joint_trajectory.points.size(); ++i) {
+        const auto& point = trajectory.joint_trajectory.points[i];
+        csv_file << point.time_from_start.sec + point.time_from_start.nanosec * 1e-9 << ",";
+        
+        // write joint positions
+        for (size_t j = 0; j < point.positions.size(); ++j) {
+            csv_file << point.positions[j];
+            if (j < point.positions.size() - 1) csv_file << ",";
+        }
+        csv_file << "\n";
+    }
+
+    RCLCPP_INFO(logger, "saved trajectory data to %s", filename.c_str());
+}
 
 bool plan_and_execute(moveit::planning_interface::MoveGroupInterface& move_group,
                       const std::map<std::string, double>& target,
@@ -57,6 +102,7 @@ bool plan_and_execute(moveit::planning_interface::MoveGroupInterface& move_group
     RCLCPP_INFO(logger, "path length: %f", path_length);
     
     move_group.execute(plan);
+    saveTrajectoryToCSV(plan.trajectory_, planning_algorithm, logger);
   }
   else
   {
