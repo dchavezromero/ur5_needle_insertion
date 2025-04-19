@@ -2,40 +2,65 @@
 
 #include <rclcpp/rclcpp.hpp>
 #include <moveit/move_group_interface/move_group_interface.h>
-
-
-#include <memory>
-#include <rclcpp/rclcpp.hpp>
-#include <moveit/move_group_interface/move_group_interface.h>
+#include <moveit/planning_scene_interface/planning_scene_interface.h>
 
 bool plan_and_execute(moveit::planning_interface::MoveGroupInterface& move_group,
                       const std::map<std::string, double>& target,
                       const rclcpp::Logger& logger,
-                      const std::string& planning_algorithm = "RRTConnect")
+                      const std::string& planning_algorithm = "RRTstar",
+                      const float& planning_time = 20.0)  // Increased planning time for RRT*
 {
+  // set the planner
   move_group.setPlannerId(planning_algorithm);
+  
+  // configure RRT* specific parameters
+  // TODO(BZ): make this configurable to different planning algorithms, just hard-coding for now
+  move_group.setPlanningTime(planning_time);
+  move_group.setNumPlanningAttempts(5);  // Try multiple times to find a better path
+  move_group.setMaxVelocityScalingFactor(0.5);  // Slower execution for more precise movements
+  move_group.setMaxAccelerationScalingFactor(0.5);
+  
+  // set goal tolerances
+  move_group.setGoalOrientationTolerance(0.1);  // [rad]
+  move_group.setGoalPositionTolerance(0.01);    // [m]
+  move_group.setGoalJointTolerance(0.01);       // [rad]
 
   std::ostringstream oss;
   oss << "Joint value target:\n";
   for (const auto& [joint, value] : target)
   {
-    RCLCPP_INFO(logger, "  %s: %f", joint.c_str(), value);
-    RCLCPP_ERROR(logger, " %s", joint.c_str());
+    RCLCPP_INFO_STREAM(logger, "  " << joint << ": " << value);
     oss << "  " << joint << ": " << value << "\n";
   }
-//  RCLCPP_INFO(logger, "%s"); //, oss.str().c_str());
+  RCLCPP_INFO_STREAM(logger, oss.str());
 
   move_group.setJointValueTarget(target);
+  
+  // Plan and execute
   moveit::planning_interface::MoveGroupInterface::Plan plan;
   bool success = static_cast<bool>(move_group.plan(plan));
+  
   if (success)
   {
-    RCLCPP_INFO(logger, "TEST Planning succeeded! Executing plan...");
+    RCLCPP_INFO(logger, "planning succeeded! executing plan...");
+    // get the path length for analysis
+    double path_length = 0.0;
+    for (size_t i = 1; i < plan.trajectory_.joint_trajectory.points.size(); ++i)
+    {
+      const auto& prev = plan.trajectory_.joint_trajectory.points[i-1];
+      const auto& curr = plan.trajectory_.joint_trajectory.points[i];
+      for (size_t j = 0; j < prev.positions.size(); ++j)
+      {
+        path_length += std::abs(curr.positions[j] - prev.positions[j]);
+      }
+    }
+    RCLCPP_INFO(logger, "path length: %f", path_length);
+    
     move_group.execute(plan);
   }
   else
   {
-    RCLCPP_ERROR(logger, "FOO Planning failed!");
+    RCLCPP_ERROR(logger, "planning failed!");
   }
   return success;
 }
@@ -45,12 +70,19 @@ int main(int argc, char* argv[])
   rclcpp::init(argc, argv);
   auto const node = std::make_shared<rclcpp::Node>(
       "hello_moveit", rclcpp::NodeOptions().automatically_declare_parameters_from_overrides(true));
+  
+  // set the logging level to DEBUG to see all messages
   auto const logger = rclcpp::get_logger("hello_moveit");
+  auto error = rcutils_logging_set_logger_level(logger.get_name(), RCUTILS_LOG_SEVERITY_DEBUG);
+  if (error != RCUTILS_RET_OK)
+  {
+    RCLCPP_ERROR(logger, "Failed to set logging level to DEBUG");
+  }
 
   using moveit::planning_interface::MoveGroupInterface;
   auto move_group_interface = MoveGroupInterface(node, "ur5_arm");
 
-  // Define poses
+  // define poses
   const std::map<std::string, double> home_pose = {
       {"elbow_joint", 0.0},
       {"shoulder_lift_joint", -1.57},
@@ -89,15 +121,12 @@ int main(int argc, char* argv[])
       {"wrist_3_joint", 0.0698132}
   };
 
-  // Move through the poses
-//  RCLCPP_INFO(logger, "planning and executing home pose...");
-//  plan_and_execute(move_group_interface, home_pose, logger, "RRTConnect");
-//  rclcpp::sleep_for(std::chrono::seconds(3));
-    RCLCPP_INFO(logger, "planning and executing ready pose...");
-  plan_and_execute(move_group_interface, ready_pose, logger, "RRTConnect");
+  RCLCPP_INFO(logger, "starting motion planning sequence with RRT*...");
+  RCLCPP_INFO(logger, "planning and executing ready pose...");
+  plan_and_execute(move_group_interface, ready_pose, logger, "RRTstar");
   rclcpp::sleep_for(std::chrono::seconds(3));
   RCLCPP_INFO(logger, "planning and executing needle insertion pose...");
-  plan_and_execute(move_group_interface, needle_insertion_pose, logger, "RRTConnect");
+  plan_and_execute(move_group_interface, needle_insertion_pose, logger, "RRTstar");
 
   rclcpp::shutdown();
   return 0;
