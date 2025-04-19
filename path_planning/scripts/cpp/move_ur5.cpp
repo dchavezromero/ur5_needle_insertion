@@ -6,7 +6,15 @@
 #include <chrono>
 #include <iomanip>
 #include <sstream>
-#include <filesystem>
+#include <sensor_msgs/msg/joint_state.hpp>
+#include <mutex>
+#include <condition_variable>
+
+// Global variables for joint state recording
+std::mutex joint_state_mutex;
+std::condition_variable joint_state_cv;
+bool recording_complete = false;
+std::vector<sensor_msgs::msg::JointState> recorded_states;
 
 // get current timestamp for filename
 std::string getCurrentTimestamp() {
@@ -17,8 +25,9 @@ std::string getCurrentTimestamp() {
     return ss.str();
 }
 
-// function to save trajectory data to CSV (if we want to compare different planners)
+// function to save trajectory data to CSV
 void saveTrajectoryToCSV(const moveit_msgs::msg::RobotTrajectory& trajectory,
+                        const std::vector<sensor_msgs::msg::JointState>& actual_states,
                         const std::string& planner_name,
                         const rclcpp::Logger& logger) {
     std::string timestamp = getCurrentTimestamp();
@@ -30,18 +39,40 @@ void saveTrajectoryToCSV(const moveit_msgs::msg::RobotTrajectory& trajectory,
         return;
     }
 
-    // write header (hard-coded for now)
-    csv_file << "time,elbow_joint,shoulder_lift_joint,shoulder_pan_joint,wrist_1_joint,wrist_2_joint,wrist_3_joint\n";
+    // write header
+    csv_file << "time,planned_elbow,planned_shoulder_lift,planned_shoulder_pan,planned_wrist_1,planned_wrist_2,planned_wrist_3,";
+    csv_file << "actual_elbow,actual_shoulder_lift,actual_shoulder_pan,actual_wrist_1,actual_wrist_2,actual_wrist_3\n";
 
     // write trajectory points
     for (size_t i = 0; i < trajectory.joint_trajectory.points.size(); ++i) {
         const auto& point = trajectory.joint_trajectory.points[i];
-        csv_file << point.time_from_start.sec + point.time_from_start.nanosec * 1e-9 << ",";
+        double time = point.time_from_start.sec + point.time_from_start.nanosec * 1e-9;
+        csv_file << time << ",";
         
-        // write joint positions
+        // write planned joint positions
         for (size_t j = 0; j < point.positions.size(); ++j) {
             csv_file << point.positions[j];
             if (j < point.positions.size() - 1) csv_file << ",";
+        }
+        
+        // write actual joint positions if available
+        if (i < actual_states.size()) {
+            csv_file << ",";
+            const auto& state = actual_states[i];
+            // Find the indices of our joints in the state message
+            std::vector<size_t> joint_indices;
+            for (const auto& joint_name : {"elbow_joint", "shoulder_lift_joint", "shoulder_pan_joint",
+                                         "wrist_1_joint", "wrist_2_joint", "wrist_3_joint"}) {
+                auto it = std::find(state.name.begin(), state.name.end(), joint_name);
+                if (it != state.name.end()) {
+                    joint_indices.push_back(std::distance(state.name.begin(), it));
+                }
+            }
+            // Write actual joint positions
+            for (size_t j = 0; j < joint_indices.size(); ++j) {
+                csv_file << state.position[joint_indices[j]];
+                if (j < joint_indices.size() - 1) csv_file << ",";
+            }
         }
         csv_file << "\n";
     }
@@ -53,31 +84,21 @@ bool plan_and_execute(moveit::planning_interface::MoveGroupInterface& move_group
                       const std::map<std::string, double>& target,
                       const rclcpp::Logger& logger,
                       const std::string& planning_algorithm = "RRTstar",
-                      const float& planning_time = 20.0)  // Increased planning time for RRT*
+                      const float& planning_time = 20.0)
 {
   // set the planner
   move_group.setPlannerId(planning_algorithm);
   
   // configure RRT* specific parameters
-  // TODO(BZ): make this configurable to different planning algorithms, just hard-coding for now
   move_group.setPlanningTime(planning_time);
-  move_group.setNumPlanningAttempts(5);  // Try multiple times to find a better path
-  move_group.setMaxVelocityScalingFactor(0.5);  // Slower execution for more precise movements
+  move_group.setNumPlanningAttempts(5);
+  move_group.setMaxVelocityScalingFactor(0.5);
   move_group.setMaxAccelerationScalingFactor(0.5);
   
   // set goal tolerances
   move_group.setGoalOrientationTolerance(0.1);  // [rad]
   move_group.setGoalPositionTolerance(0.01);    // [m]
   move_group.setGoalJointTolerance(0.01);       // [rad]
-
-  std::ostringstream oss;
-  oss << "Joint value target:\n";
-  for (const auto& [joint, value] : target)
-  {
-    RCLCPP_INFO_STREAM(logger, "  " << joint << ": " << value);
-    oss << "  " << joint << ": " << value << "\n";
-  }
-  RCLCPP_INFO_STREAM(logger, oss.str());
 
   move_group.setJointValueTarget(target);
   
@@ -88,21 +109,35 @@ bool plan_and_execute(moveit::planning_interface::MoveGroupInterface& move_group
   if (success)
   {
     RCLCPP_INFO(logger, "planning succeeded! executing plan...");
-    // get the path length for analysis
-    double path_length = 0.0;
-    for (size_t i = 1; i < plan.trajectory_.joint_trajectory.points.size(); ++i)
-    {
-      const auto& prev = plan.trajectory_.joint_trajectory.points[i-1];
-      const auto& curr = plan.trajectory_.joint_trajectory.points[i];
-      for (size_t j = 0; j < prev.positions.size(); ++j)
-      {
-        path_length += std::abs(curr.positions[j] - prev.positions[j]);
-      }
-    }
-    RCLCPP_INFO(logger, "path length: %f", path_length);
     
-    move_group.execute(plan);
-    saveTrajectoryToCSV(plan.trajectory_, planning_algorithm, logger);
+    // Clear previous recorded states and start new recording
+    {
+      std::lock_guard<std::mutex> lock(joint_state_mutex);
+      recorded_states.clear();
+      recording_complete = false;
+    }
+    
+    // Execute the plan
+    moveit::core::MoveItErrorCode execution_result = move_group.execute(plan);
+    if (execution_result == moveit::core::MoveItErrorCode::SUCCESS) {
+      RCLCPP_INFO(logger, "execution completed successfully");
+      
+      // Wait a short time for the last joint states to be recorded
+      rclcpp::sleep_for(std::chrono::milliseconds(500));
+      
+      // Stop recording
+      {
+        std::lock_guard<std::mutex> lock(joint_state_mutex);
+        recording_complete = true;
+      }
+      joint_state_cv.notify_all();
+      
+      // Save both planned and actual trajectories
+      saveTrajectoryToCSV(plan.trajectory_, recorded_states, planning_algorithm, logger);
+    } else {
+      RCLCPP_ERROR(logger, "execution failed with error code: %d", execution_result.val);
+      return false;
+    }
   }
   else
   {
@@ -117,13 +152,22 @@ int main(int argc, char* argv[])
   auto const node = std::make_shared<rclcpp::Node>(
       "hello_moveit", rclcpp::NodeOptions().automatically_declare_parameters_from_overrides(true));
   
-  // set the logging level to DEBUG to see all messages
   auto const logger = rclcpp::get_logger("hello_moveit");
   auto error = rcutils_logging_set_logger_level(logger.get_name(), RCUTILS_LOG_SEVERITY_DEBUG);
   if (error != RCUTILS_RET_OK)
   {
     RCLCPP_ERROR(logger, "Failed to set logging level to DEBUG");
   }
+
+  // Create joint state subscriber
+  auto joint_state_sub = node->create_subscription<sensor_msgs::msg::JointState>(
+      "/joint_states", 10,
+      [](const sensor_msgs::msg::JointState::SharedPtr msg) {
+          std::lock_guard<std::mutex> lock(joint_state_mutex);
+          if (!recording_complete) {
+              recorded_states.push_back(*msg);
+          }
+      });
 
   using moveit::planning_interface::MoveGroupInterface;
   auto move_group_interface = MoveGroupInterface(node, "ur5_arm");
@@ -168,11 +212,27 @@ int main(int argc, char* argv[])
   };
 
   RCLCPP_INFO(logger, "starting motion planning sequence with RRT*...");
+  
+  // Execute ready pose
   RCLCPP_INFO(logger, "planning and executing ready pose...");
-  plan_and_execute(move_group_interface, ready_pose, logger, "RRTstar");
+  bool ready_success = plan_and_execute(move_group_interface, ready_pose, logger, "RRTstar");
+  
+  if (!ready_success) {
+    RCLCPP_ERROR(logger, "Failed to execute ready pose, aborting sequence");
+    rclcpp::shutdown();
+    return 1;
+  }
+  
+  RCLCPP_INFO(logger, "waiting for 3 seconds before next pose...");
   rclcpp::sleep_for(std::chrono::seconds(3));
+  
+  // Execute needle insertion pose
   RCLCPP_INFO(logger, "planning and executing needle insertion pose...");
-  plan_and_execute(move_group_interface, needle_insertion_pose, logger, "RRTstar");
+  bool needle_success = plan_and_execute(move_group_interface, needle_insertion_pose, logger, "RRTstar");
+  
+  if (!needle_success) {
+    RCLCPP_ERROR(logger, "Failed to execute needle insertion pose");
+  }
 
   rclcpp::shutdown();
   return 0;

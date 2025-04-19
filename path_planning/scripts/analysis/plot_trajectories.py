@@ -8,27 +8,35 @@ import os
 from pathlib import Path
 
 def load_trajectory_data(filename):
-    """load trajectory data from csv file."""
+    """Load trajectory data from CSV file."""
     df = pd.read_csv(filename)
+    print(f"\nColumns in {filename}:")
+    print(df.columns.tolist())
     return df
 
 def plot_joint_trajectories(df, title, save_path=None):
-    """plot joint trajectories over time."""
+    """Plot joint trajectories over time."""
     plt.figure(figsize=(12, 8))
     
-    # joint names without the planned/actual prefix
-    joint_names = ['elbow', 'shoulder_lift', 'shoulder_pan',
-                  'wrist_1', 'wrist_2', 'wrist_3']
+    # Joint names and their corresponding column names in the CSV
+    joint_mapping = {
+        'elbow': ('elbow_joint', 'elbow_joint'),
+        'shoulder_lift': ('shoulder_lift_joint', 'shoulder_lift_joint'),
+        'shoulder_pan': ('shoulder_pan_joint', 'shoulder_pan_joint'),
+        'wrist_1': ('wrist_1_joint', 'wrist_1_joint'),
+        'wrist_2': ('wrist_2_joint', 'wrist_2_joint'),
+        'wrist_3': ('wrist_3_joint', 'wrist_3_joint')
+    }
     
-    # plot each joint
-    for joint in joint_names:
-        # plot planned trajectory (solid line)
-        plt.plot(df['time'], df[f'planned_{joint}'], 
-                label=f'Planned {joint}', linewidth=2)
+    # Plot each joint
+    for joint_name, (planned_col, actual_col) in joint_mapping.items():
+        # Plot planned trajectory (solid line)
+        plt.plot(df['time'], df[planned_col], 
+                label=f'Planned {joint_name}', linewidth=2)
         
-        # plot actual trajectory (dotted line)
-        plt.plot(df['time'], df[f'actual_{joint}'], 
-                label=f'Actual {joint}', linestyle='--', linewidth=2)
+        # Plot actual trajectory (dotted line)
+        plt.plot(df['time'], df[actual_col], 
+                label=f'Actual {joint_name}', linestyle='--', linewidth=2)
     
     plt.xlabel('Time (s)')
     plt.ylabel('Joint Position (rad)')
@@ -38,104 +46,135 @@ def plot_joint_trajectories(df, title, save_path=None):
     plt.tight_layout()
     
     if save_path:
-        plt.savefig(save_path, bbox_inches='tight')
-    plt.show()
+        # Ensure the directory exists
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(save_path, bbox_inches='tight', dpi=300)
+        print(f"Saved plot to: {save_path}")
+    plt.close()  # Close the figure to free memory
 
 def calculate_metrics(df):
-    """calculate various metrics for the trajectory."""
+    """Calculate various metrics for the trajectory."""
     metrics = {}
     
-    # time duration
+    # Time duration
     metrics['duration'] = df['time'].max() - df['time'].min()
     
-    # maximum velocity (approximate) for both planned and actual
-    joint_names = ['elbow', 'shoulder_lift', 'shoulder_pan',
-                  'wrist_1', 'wrist_2', 'wrist_3']
+    # Joint names and their corresponding column names
+    joint_mapping = {
+        'elbow': ('elbow_joint', 'elbow_joint'),
+        'shoulder_lift': ('shoulder_lift_joint', 'shoulder_lift_joint'),
+        'shoulder_pan': ('shoulder_pan_joint', 'shoulder_pan_joint'),
+        'wrist_1': ('wrist_1_joint', 'wrist_1_joint'),
+        'wrist_2': ('wrist_2_joint', 'wrist_2_joint'),
+        'wrist_3': ('wrist_3_joint', 'wrist_3_joint')
+    }
     
+    # Maximum velocity (approximate) for both planned and actual
     max_velocities = {'planned': {}, 'actual': {}}
-    for joint in joint_names:
-        # planned velocities
-        planned_velocities = np.diff(df[f'planned_{joint}']) / np.diff(df['time'])
-        max_velocities['planned'][joint] = np.max(np.abs(planned_velocities))
+    for joint_name, (planned_col, actual_col) in joint_mapping.items():
+        # Planned velocities
+        planned_velocities = np.diff(df[planned_col]) / np.diff(df['time'])
+        max_velocities['planned'][joint_name] = np.max(np.abs(planned_velocities))
         
-        # actual velocities
-        actual_velocities = np.diff(df[f'actual_{joint}']) / np.diff(df['time'])
-        max_velocities['actual'][joint] = np.max(np.abs(actual_velocities))
+        # Actual velocities
+        actual_velocities = np.diff(df[actual_col]) / np.diff(df['time'])
+        max_velocities['actual'][joint_name] = np.max(np.abs(actual_velocities))
     
     metrics['max_velocities'] = max_velocities
     
-    # path length for both planned and actual
+    # Path length for both planned and actual
     path_lengths = {'planned': 0, 'actual': 0}
     for i in range(1, len(df)):
         planned_diff = 0
         actual_diff = 0
-        for joint in joint_names:
-            planned_diff += (df[f'planned_{joint}'].iloc[i] - df[f'planned_{joint}'].iloc[i-1])**2
-            actual_diff += (df[f'actual_{joint}'].iloc[i] - df[f'actual_{joint}'].iloc[i-1])**2
+        for joint_name, (planned_col, actual_col) in joint_mapping.items():
+            planned_diff += (df[planned_col].iloc[i] - df[planned_col].iloc[i-1])**2
+            actual_diff += (df[actual_col].iloc[i] - df[actual_col].iloc[i-1])**2
         path_lengths['planned'] += np.sqrt(planned_diff)
         path_lengths['actual'] += np.sqrt(actual_diff)
     
     metrics['path_lengths'] = path_lengths
     
+    # Calculate convergence time (time until actual position is within threshold of planned)
+    convergence_threshold = 0.01  # rad
+    convergence_times = {}
+    for joint_name, (planned_col, actual_col) in joint_mapping.items():
+        planned_final = df[planned_col].iloc[-1]
+        actual_positions = df[actual_col]
+        convergence_idx = np.where(np.abs(actual_positions - planned_final) < convergence_threshold)[0]
+        if len(convergence_idx) > 0:
+            convergence_times[joint_name] = df['time'].iloc[convergence_idx[0]]
+        else:
+            convergence_times[joint_name] = df['time'].iloc[-1]
+    
+    metrics['convergence_times'] = convergence_times
+    metrics['max_convergence_time'] = max(convergence_times.values())
+    
     return metrics
 
 def main():
-    # get the directory where this script is located
+    # Get the directory where this script is located
     script_dir = Path(__file__).parent.absolute()
-    # go up one directory to the cpp directory
+    # Go up one directory to the cpp directory
     cpp_dir = script_dir.parent / 'cpp'
     
-    print(f"looking for trajectory files in: {cpp_dir}")
+    print(f"Looking for trajectory files in: {cpp_dir}")
     
-    # find all trajectory csv files
+    # Find all trajectory CSV files
     csv_files = list(cpp_dir.glob('trajectory_*.csv'))
     
     if not csv_files:
-        print(f"no trajectory files found in {cpp_dir}!")
-        print("make sure you've run the c++ node and it's saving files in the correct location.")
+        print(f"No trajectory files found in {cpp_dir}!")
+        print("Make sure you've run the C++ node and it's saving files in the correct location.")
         return
     
-    print(f"found {len(csv_files)} trajectory files:")
+    print(f"Found {len(csv_files)} trajectory files:")
     for f in csv_files:
         print(f"  - {f.name}")
     
-    # create output directory for plots
+    # Create output directory for plots
     output_dir = script_dir / 'trajectory_analysis'
-    output_dir.mkdir(exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    print(f"\nSaving plots to: {output_dir}")
     
-    # analyze each trajectory
+    # Analyze each trajectory
     for csv_file in csv_files:
-        print(f"\nanalyzing {csv_file.name}...")
+        print(f"\nAnalyzing {csv_file.name}...")
         
         try:
-            # load data
+            # Load data
             df = load_trajectory_data(csv_file)
             
-            # calculate metrics
+            # Calculate metrics
             metrics = calculate_metrics(df)
             
-            # print metrics
-            print("\nmetrics:")
-            print(f"duration: {metrics['duration']:.2f} seconds")
-            print("\npath lengths:")
-            print(f"planned: {metrics['path_lengths']['planned']:.2f} rad")
-            print(f"actual: {metrics['path_lengths']['actual']:.2f} rad")
+            # Print metrics
+            print("\nMetrics:")
+            print(f"Duration: {metrics['duration']:.2f} seconds")
+            print("\nPath Lengths:")
+            print(f"Planned: {metrics['path_lengths']['planned']:.2f} rad")
+            print(f"Actual: {metrics['path_lengths']['actual']:.2f} rad")
             
-            print("\nmaximum velocities:")
-            print("planned:")
+            print("\nMaximum Velocities:")
+            print("Planned:")
             for joint, vel in metrics['max_velocities']['planned'].items():
                 print(f"  {joint}: {vel:.2f} rad/s")
-            print("actual:")
+            print("Actual:")
             for joint, vel in metrics['max_velocities']['actual'].items():
                 print(f"  {joint}: {vel:.2f} rad/s")
             
-            # plot trajectories
-            plot_title = f"joint trajectories - {csv_file.stem}"
+            print("\nConvergence Times (time until within 0.01 rad of final position):")
+            for joint, time in metrics['convergence_times'].items():
+                print(f"  {joint}: {time:.2f} seconds")
+            print(f"Maximum convergence time: {metrics['max_convergence_time']:.2f} seconds")
+            
+            # Plot trajectories
+            plot_title = f"Joint Trajectories - {csv_file.stem}"
             plot_path = output_dir / f"{csv_file.stem}.png"
             plot_joint_trajectories(df, plot_title, plot_path)
             
         except Exception as e:
-            print(f"error processing {csv_file.name}: {str(e)}")
+            print(f"Error processing {csv_file.name}: {str(e)}")
 
 if __name__ == "__main__":
-    main()
+    main() 
