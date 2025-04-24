@@ -99,7 +99,10 @@ The `gazebo_ros2_control` package provides us the necessary hardware plugins and
 ---
 
 ## **6. Running a ROS 2 Node**
-
+Ensure to export the hospital models directory for Gazebo:
+```bash
+export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:~/ros_ws/src/ur5_needle_insertion/hospital_models/models
+```
 To launch the UR5 robot in rviz:
 ```bash
 ros2 launch ur5_robot_description ur5_rviz.launch.py
