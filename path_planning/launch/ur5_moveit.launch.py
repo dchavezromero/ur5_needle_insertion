@@ -208,7 +208,7 @@ def generate_launch_description():
             spawn_patient,
             spawn_surgeon,
             spawn_side_table,
-            #rviz_node,
+            rviz_node,
             static_tf,
             run_move_group_node,
             ros2_control_node,
