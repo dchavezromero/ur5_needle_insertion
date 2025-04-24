@@ -12,6 +12,8 @@
 #include <geometry_msgs/msg/pose.hpp>
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+#include <tf2_ros/transform_listener.h>
+#include <tf2_ros/buffer.h>
 
 // Global variables for joint state recording
 std::mutex joint_state_mutex;
@@ -242,6 +244,12 @@ int main(int argc, char* argv[])
     RCLCPP_ERROR(logger, "Failed to set logging level to DEBUG");
   }
 
+  // Create TF2 buffer and listener
+  std::shared_ptr<tf2_ros::Buffer> tf_buffer = 
+    std::make_shared<tf2_ros::Buffer>(node->get_clock());
+  std::shared_ptr<tf2_ros::TransformListener> tf_listener = 
+    std::make_shared<tf2_ros::TransformListener>(*tf_buffer);
+
   // Create joint state subscriber
   auto joint_state_sub = node->create_subscription<sensor_msgs::msg::JointState>(
       "/joint_states", 10,
@@ -295,48 +303,39 @@ int main(int argc, char* argv[])
   };
 
   RCLCPP_INFO(logger, "starting motion planning sequence with RRT*...");
-  
-  // Execute ready pose
-  RCLCPP_INFO(logger, "planning and executing ready pose...");
-  bool ready_success = plan_and_execute(move_group_interface, ready_pose, logger, "RRTstar");
-  
-  if (!ready_success) {
-    RCLCPP_ERROR(logger, "Failed to execute ready pose, aborting sequence");
-    rclcpp::shutdown();
-    return 1;
-  }
-  
-  RCLCPP_INFO(logger, "waiting for 3 seconds before next pose...");
-  rclcpp::sleep_for(std::chrono::seconds(3));
-  
-  // Execute needle insertion pose
-  RCLCPP_INFO(logger, "planning and executing needle insertion pose...");
-  bool needle_success = plan_and_execute(move_group_interface, needle_insertion_pose, logger, "RRTstar");
-  
-  if (!needle_success) {
-    RCLCPP_ERROR(logger, "Failed to execute needle insertion pose");
-  }
 
-  // Example of using pose-based planning
-  RCLCPP_INFO(logger, "Demonstrating pose-based planning...");
+  // Wait for transforms to be available
+  RCLCPP_INFO(logger, "Waiting for transforms to become available...");
+  rclcpp::sleep_for(std::chrono::seconds(2));
   
-  // Create a target pose
+  // Get the arm insertion point transform using TF2
   geometry_msgs::msg::Pose target_pose;
-  target_pose.position.x = 0.4;    // [m]
-  target_pose.position.y = 0.1;    // [m] 
-  target_pose.position.z = 0.5;    // [m]
   
-  // Set orientation using RPY (Roll, Pitch, Yaw) in radians
-  double roll = 0.0;
-  double pitch = 0.0;  // 90 degrees around Y axis
-  double yaw = 0.0;
-  target_pose.orientation = rpy_to_quaternion(roll, pitch, yaw);
-  
-  // Call the pose-based planning function
-  bool pose_success = plan_and_execute(move_group_interface, target_pose, logger, "RRTstar");
-  
-  if (!pose_success) {
-    RCLCPP_ERROR(logger, "Failed to execute pose-based planning");
+  try {
+    // Look up the transform from world to arm_insertion_point
+    geometry_msgs::msg::TransformStamped transform_stamped;
+    transform_stamped = tf_buffer->lookupTransform("world", "leg_insertion_point", 
+                                                  tf2::TimePointZero);
+    
+    // Convert the transform to a pose
+    target_pose.position.x = transform_stamped.transform.translation.x;
+    target_pose.position.y = transform_stamped.transform.translation.y;
+    target_pose.position.z = transform_stamped.transform.translation.z;
+    
+
+    target_pose.orientation = transform_stamped.transform.rotation;
+    
+    RCLCPP_INFO(logger, "Planning to arm insertion point at: [%f, %f, %f]", 
+               target_pose.position.x, target_pose.position.y, target_pose.position.z);
+    
+    // Call the pose-based planning function
+    bool pose_success = plan_and_execute(move_group_interface, target_pose, logger, "RRTstar");
+    
+    if (!pose_success) {
+      RCLCPP_ERROR(logger, "Failed to execute pose-based planning to arm insertion point");
+    }
+  } catch (const tf2::TransformException& ex) {
+    RCLCPP_ERROR(logger, "Could not transform from 'world' to 'arm_insertion_point': %s", ex.what());
   }
 
   rclcpp::shutdown();

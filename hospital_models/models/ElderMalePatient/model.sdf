@@ -121,7 +121,7 @@
       <pose>0 0 0 0 0 0</pose>
     </joint>
 
-    <link name="divider">
+    <!-- <link name="divider">
       <pose>0 0 0 0 0 1.57</pose>
 
       <visual name="visual">
@@ -135,7 +135,7 @@
           <mesh><uri>model://ElderMalePatient/meshes/Divider.stl</uri></mesh>
         </geometry>
       </collision>
-    </link>
+    </link> -->
 
     <joint name="leg_insertion_point_joint" type="fixed">
       <parent>link</parent>
