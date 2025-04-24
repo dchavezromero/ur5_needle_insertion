@@ -9,6 +9,9 @@
 #include <sensor_msgs/msg/joint_state.hpp>
 #include <mutex>
 #include <condition_variable>
+#include <geometry_msgs/msg/pose.hpp>
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
 // Global variables for joint state recording
 std::mutex joint_state_mutex;
@@ -80,6 +83,18 @@ void saveTrajectoryToCSV(const moveit_msgs::msg::RobotTrajectory& trajectory,
     RCLCPP_INFO(logger, "saved trajectory data to %s", filename.c_str());
 }
 
+// Utility function to convert RPY angles to quaternion
+geometry_msgs::msg::Quaternion rpy_to_quaternion(double roll, double pitch, double yaw) {
+  tf2::Quaternion q;
+  q.setRPY(roll, pitch, yaw);
+  geometry_msgs::msg::Quaternion quat;
+  quat.x = q.x();
+  quat.y = q.y();
+  quat.z = q.z();
+  quat.w = q.w();
+  return quat;
+}
+
 bool plan_and_execute(moveit::planning_interface::MoveGroupInterface& move_group,
                       const std::map<std::string, double>& target,
                       const rclcpp::Logger& logger,
@@ -101,6 +116,74 @@ bool plan_and_execute(moveit::planning_interface::MoveGroupInterface& move_group
   move_group.setGoalJointTolerance(0.01);       // [rad]
 
   move_group.setJointValueTarget(target);
+  
+  // Plan and execute
+  moveit::planning_interface::MoveGroupInterface::Plan plan;
+  bool success = static_cast<bool>(move_group.plan(plan));
+  
+  if (success)
+  {
+    RCLCPP_INFO(logger, "planning succeeded! executing plan...");
+    
+    // Clear previous recorded states and start new recording
+    {
+      std::lock_guard<std::mutex> lock(joint_state_mutex);
+      recorded_states.clear();
+      recording_complete = false;
+    }
+    
+    // Execute the plan
+    moveit::core::MoveItErrorCode execution_result = move_group.execute(plan);
+    if (execution_result == moveit::core::MoveItErrorCode::SUCCESS) {
+      RCLCPP_INFO(logger, "execution completed successfully");
+      
+      // Wait a short time for the last joint states to be recorded
+      rclcpp::sleep_for(std::chrono::milliseconds(500));
+      
+      // Stop recording
+      {
+        std::lock_guard<std::mutex> lock(joint_state_mutex);
+        recording_complete = true;
+      }
+      joint_state_cv.notify_all();
+      
+      // Save both planned and actual trajectories
+      saveTrajectoryToCSV(plan.trajectory_, recorded_states, planning_algorithm, logger);
+    } else {
+      RCLCPP_ERROR(logger, "execution failed with error code: %d", execution_result.val);
+      return false;
+    }
+  }
+  else
+  {
+    RCLCPP_ERROR(logger, "planning failed!");
+  }
+  return success;
+}
+
+// Overloaded function that accepts a pose target instead of joint values
+bool plan_and_execute(moveit::planning_interface::MoveGroupInterface& move_group,
+                      const geometry_msgs::msg::Pose& target_pose,
+                      const rclcpp::Logger& logger,
+                      const std::string& planning_algorithm = "RRTstar",
+                      const float& planning_time = 20.0)
+{
+  // set the planner
+  move_group.setPlannerId(planning_algorithm);
+  
+  // configure RRT* specific parameters
+  move_group.setPlanningTime(planning_time);
+  move_group.setNumPlanningAttempts(5);
+  move_group.setMaxVelocityScalingFactor(0.5);
+  move_group.setMaxAccelerationScalingFactor(0.5);
+  
+  // set goal tolerances
+  move_group.setGoalOrientationTolerance(0.1);  // [rad]
+  move_group.setGoalPositionTolerance(0.01);    // [m]
+  move_group.setGoalJointTolerance(0.01);       // [rad]
+
+  // Set the pose target
+  move_group.setPoseTarget(target_pose);
   
   // Plan and execute
   moveit::planning_interface::MoveGroupInterface::Plan plan;
@@ -232,6 +315,28 @@ int main(int argc, char* argv[])
   
   if (!needle_success) {
     RCLCPP_ERROR(logger, "Failed to execute needle insertion pose");
+  }
+
+  // Example of using pose-based planning
+  RCLCPP_INFO(logger, "Demonstrating pose-based planning...");
+  
+  // Create a target pose
+  geometry_msgs::msg::Pose target_pose;
+  target_pose.position.x = 0.4;    // [m]
+  target_pose.position.y = 0.1;    // [m] 
+  target_pose.position.z = 0.5;    // [m]
+  
+  // Set orientation using RPY (Roll, Pitch, Yaw) in radians
+  double roll = 0.0;
+  double pitch = 0.0;  // 90 degrees around Y axis
+  double yaw = 0.0;
+  target_pose.orientation = rpy_to_quaternion(roll, pitch, yaw);
+  
+  // Call the pose-based planning function
+  bool pose_success = plan_and_execute(move_group_interface, target_pose, logger, "RRTstar");
+  
+  if (!pose_success) {
+    RCLCPP_ERROR(logger, "Failed to execute pose-based planning");
   }
 
   rclcpp::shutdown();
