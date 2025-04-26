@@ -143,7 +143,7 @@
       <pose>0 0 0 0 0 0</pose>
     </joint>
 
-    <link name="chest_insertion_point">
+    <link name="torso_insertion_point">
       <pose>-0.365 0 1.0 0 0 0</pose>
 
       <visual name="visual">
@@ -159,13 +159,13 @@
       </collision>
     </link>
 
-    <joint name="chest_insertion_point_joint" type="fixed">
+    <joint name="torso_insertion_point_joint" type="fixed">
       <parent>link</parent>
-      <child>chest_insertion_point</child>
+      <child>torso_insertion_point</child>
       <pose>0 0 0 0 0 0</pose>
     </joint>
 
-    <link name="chest2_insertion_point">
+    <link name="torso2_insertion_point">
       <pose>-0.25 0 1.0 0 0 0</pose>
 
       <visual name="visual">
@@ -181,9 +181,141 @@
       </collision>
     </link>
 
-    <joint name="chest2_insertion_point_joint" type="fixed">
+    <joint name="torso2_insertion_point_joint" type="fixed">
       <parent>link</parent>
-      <child>chest2_insertion_point</child>
+      <child>torso2_insertion_point</child>
+      <pose>0 0 0 0 0 0</pose>
+    </joint>
+
+    <link name="torso3_insertion_point">
+      <pose>0 0 1.025 0 0 0</pose>
+
+      <visual name="visual">
+        <geometry>
+          <mesh><uri>model://ElderMalePatient/meshes/Needle_Tube.stl</uri></mesh>
+        </geometry>
+      </visual>
+
+      <collision name="collision">
+        <geometry>
+          <mesh><uri>model://ElderMalePatient/meshes/Needle_Tube.stl</uri></mesh>
+        </geometry>
+      </collision>
+    </link>
+
+    <joint name="torso3_insertion_point_joint" type="fixed">
+      <parent>link</parent>
+      <child>torso3_insertion_point</child>
+      <pose>0 0 0 0 0 0</pose>
+    </joint>
+
+    <link name="torso4_insertion_point">
+      <pose>-0.1 0 1.025 0 0 0</pose>
+
+      <visual name="visual">
+        <geometry>
+          <mesh><uri>model://ElderMalePatient/meshes/Needle_Tube.stl</uri></mesh>
+        </geometry>
+      </visual>
+
+      <collision name="collision">
+        <geometry>
+          <mesh><uri>model://ElderMalePatient/meshes/Needle_Tube.stl</uri></mesh>
+        </geometry>
+      </collision>
+    </link>
+
+    <joint name="torso4_insertion_point_joint" type="fixed">
+      <parent>link</parent>
+      <child>torso4_insertion_point</child>
+      <pose>0 0 0 0 0 0</pose>
+    </joint>  
+    
+    <link name="torso5_insertion_point">
+      <pose>-0.125 -0.05 1.0 0 0 0</pose>
+
+      <visual name="visual">
+        <geometry>
+          <mesh><uri>model://ElderMalePatient/meshes/Needle_Tube.stl</uri></mesh>
+        </geometry>
+      </visual>
+
+      <collision name="collision">
+        <geometry>
+          <mesh><uri>model://ElderMalePatient/meshes/Needle_Tube.stl</uri></mesh>
+        </geometry>
+      </collision>
+    </link>
+
+    <joint name="torso5_insertion_point_joint" type="fixed">
+      <parent>link</parent>
+      <child>torso5_insertion_point</child>
+      <pose>0 0 0 0 0 0</pose>
+    </joint>
+    
+    <link name="torso6_insertion_point">
+      <pose>-0.3 -0.1 1.0 0 0 0</pose>
+
+      <visual name="visual">
+        <geometry>
+          <mesh><uri>model://ElderMalePatient/meshes/Needle_Tube.stl</uri></mesh>
+        </geometry>
+      </visual>
+
+      <collision name="collision">
+        <geometry>
+          <mesh><uri>model://ElderMalePatient/meshes/Needle_Tube.stl</uri></mesh>
+        </geometry>
+      </collision>
+    </link>
+
+    <joint name="torso6_insertion_point_joint" type="fixed">
+      <parent>link</parent>
+      <child>torso6_insertion_point</child>
+      <pose>0 0 0 0 0 0</pose>
+    </joint> 
+
+    <link name="torso7_insertion_point">
+      <pose>-0.15 -0.1 0.975 0 0 0</pose>
+
+      <visual name="visual">
+        <geometry>
+          <mesh><uri>model://ElderMalePatient/meshes/Needle_Tube.stl</uri></mesh>
+        </geometry>
+      </visual>
+
+      <collision name="collision">
+        <geometry>
+          <mesh><uri>model://ElderMalePatient/meshes/Needle_Tube.stl</uri></mesh>
+        </geometry>
+      </collision>
+    </link>
+
+    <joint name="torso7_insertion_point_joint" type="fixed">
+      <parent>link</parent>
+      <child>torso7_insertion_point</child>
+      <pose>0 0 0 0 0 0</pose>
+    </joint> 
+
+    <link name="torso8_insertion_point">
+      <pose>-0.15 0.05 0.975 0 0 0</pose>
+
+      <visual name="visual">
+        <geometry>
+          <mesh><uri>model://ElderMalePatient/meshes/Needle_Tube.stl</uri></mesh>
+        </geometry>
+      </visual>
+
+      <collision name="collision">
+        <geometry>
+          <mesh><uri>model://ElderMalePatient/meshes/Needle_Tube.stl</uri></mesh>
+        </geometry>
+      </collision>
+    </link>
+
+    <joint name="torso8_insertion_point_joint" type="fixed">
+      <parent>link</parent>
+      <child>torso8_insertion_point</child>
       <pose>0 0 0 0 0 0</pose>
     </joint>
 
@@ -297,6 +429,7 @@
       <pose>0 0 0 0 0 0</pose>
     </joint>
 
+    <!-- 
     <link name="divider">
       <pose>0 0 0 0 0 1.57</pose>
 
@@ -318,6 +451,7 @@
       <child>leg_insertion_point</child>
       <pose>0 0 0 0 0 0</pose>
     </joint>
+    -->
 
     <!--
     <link name="neck1_insertion_point">
