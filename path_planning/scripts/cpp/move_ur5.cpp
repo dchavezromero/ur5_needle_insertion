@@ -14,6 +14,7 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <tf2_ros/transform_listener.h>
 #include <tf2_ros/buffer.h>
+#include <moveit_msgs/srv/get_position_ik.hpp>
 
 // Global variables for joint state recording
 std::mutex joint_state_mutex;
@@ -21,7 +22,7 @@ std::condition_variable joint_state_cv;
 bool recording_complete = false;
 std::vector<sensor_msgs::msg::JointState> recorded_states;
 
-// get current timestamp for filename
+// Get current timestamp for filename
 std::string getCurrentTimestamp() {
     auto now = std::chrono::system_clock::now();
     auto now_c = std::chrono::system_clock::to_time_t(now);
@@ -30,7 +31,7 @@ std::string getCurrentTimestamp() {
     return ss.str();
 }
 
-// function to save trajectory data to CSV
+// Function to save trajectory data to CSV
 void saveTrajectoryToCSV(const moveit_msgs::msg::RobotTrajectory& trajectory,
                         const std::vector<sensor_msgs::msg::JointState>& actual_states,
                         const std::string& planner_name,
@@ -44,23 +45,23 @@ void saveTrajectoryToCSV(const moveit_msgs::msg::RobotTrajectory& trajectory,
         return;
     }
 
-    // write header
+    // Write header
     csv_file << "time,planned_elbow,planned_shoulder_lift,planned_shoulder_pan,planned_wrist_1,planned_wrist_2,planned_wrist_3,";
     csv_file << "actual_elbow,actual_shoulder_lift,actual_shoulder_pan,actual_wrist_1,actual_wrist_2,actual_wrist_3\n";
 
-    // write trajectory points
+    // Write trajectory points
     for (size_t i = 0; i < trajectory.joint_trajectory.points.size(); ++i) {
         const auto& point = trajectory.joint_trajectory.points[i];
         double time = point.time_from_start.sec + point.time_from_start.nanosec * 1e-9;
         csv_file << time << ",";
         
-        // write planned joint positions
+        // Write planned joint positions
         for (size_t j = 0; j < point.positions.size(); ++j) {
             csv_file << point.positions[j];
             if (j < point.positions.size() - 1) csv_file << ",";
         }
         
-        // write actual joint positions if available
+        // Write actual joint positions if available
         if (i < actual_states.size()) {
             csv_file << ",";
             const auto& state = actual_states[i];
@@ -82,7 +83,7 @@ void saveTrajectoryToCSV(const moveit_msgs::msg::RobotTrajectory& trajectory,
         csv_file << "\n";
     }
 
-    RCLCPP_INFO(logger, "saved trajectory data to %s", filename.c_str());
+    RCLCPP_INFO(logger, "Saved trajectory data to %s", filename.c_str());
 }
 
 // Utility function to convert RPY angles to quaternion
@@ -103,16 +104,16 @@ bool plan_and_execute(moveit::planning_interface::MoveGroupInterface& move_group
                       const std::string& planning_algorithm = "RRTstar",
                       const float& planning_time = 20.0)
 {
-  // set the planner
+  // Set the planner
   move_group.setPlannerId(planning_algorithm);
   
-  // configure RRT* specific parameters
+  // Configure RRT* specific parameters
   move_group.setPlanningTime(planning_time);
   move_group.setNumPlanningAttempts(5);
   move_group.setMaxVelocityScalingFactor(0.5);
   move_group.setMaxAccelerationScalingFactor(0.5);
   
-  // set goal tolerances
+  // Set goal tolerances
   move_group.setGoalOrientationTolerance(0.1);  // [rad]
   move_group.setGoalPositionTolerance(0.01);    // [m]
   move_group.setGoalJointTolerance(0.01);       // [rad]
@@ -125,7 +126,7 @@ bool plan_and_execute(moveit::planning_interface::MoveGroupInterface& move_group
   
   if (success)
   {
-    RCLCPP_INFO(logger, "planning succeeded! executing plan...");
+    RCLCPP_INFO(logger, "Planning succeeded! Executing plan...");
     
     // Clear previous recorded states and start new recording
     {
@@ -137,7 +138,7 @@ bool plan_and_execute(moveit::planning_interface::MoveGroupInterface& move_group
     // Execute the plan
     moveit::core::MoveItErrorCode execution_result = move_group.execute(plan);
     if (execution_result == moveit::core::MoveItErrorCode::SUCCESS) {
-      RCLCPP_INFO(logger, "execution completed successfully");
+      RCLCPP_INFO(logger, "Execution completed successfully");
       
       // Wait a short time for the last joint states to be recorded
       rclcpp::sleep_for(std::chrono::milliseconds(500));
@@ -152,83 +153,124 @@ bool plan_and_execute(moveit::planning_interface::MoveGroupInterface& move_group
       // Save both planned and actual trajectories
       saveTrajectoryToCSV(plan.trajectory_, recorded_states, planning_algorithm, logger);
     } else {
-      RCLCPP_ERROR(logger, "execution failed with error code: %d", execution_result.val);
+      RCLCPP_ERROR(logger, "Execution failed with error code: %d", execution_result.val);
       return false;
     }
   }
   else
   {
-    RCLCPP_ERROR(logger, "planning failed!");
+    RCLCPP_ERROR(logger, "Planning failed!");
   }
   return success;
 }
 
-// Overloaded function that accepts a pose target instead of joint values
-bool plan_and_execute(moveit::planning_interface::MoveGroupInterface& move_group,
-                      const geometry_msgs::msg::Pose& target_pose,
-                      const rclcpp::Logger& logger,
-                      const std::string& planning_algorithm = "RRTstar",
-                      const float& planning_time = 20.0)
+// Function to compute IK and then plan and execute
+bool compute_ik_and_execute(std::shared_ptr<rclcpp::Node> node,
+                           moveit::planning_interface::MoveGroupInterface& move_group,
+                           const geometry_msgs::msg::Pose& target_pose,
+                           const rclcpp::Logger& logger,
+                           const std::map<std::string, double>& ready_pose,
+                           const std::string& planning_algorithm = "RRTstar",
+                           const float& planning_time = 20.0)
 {
-  // set the planner
-  move_group.setPlannerId(planning_algorithm);
+  RCLCPP_INFO(logger, "Computing IK for target pose");
   
-  // configure RRT* specific parameters
-  move_group.setPlanningTime(planning_time);
-  move_group.setNumPlanningAttempts(5);
-  move_group.setMaxVelocityScalingFactor(0.5);
-  move_group.setMaxAccelerationScalingFactor(0.5);
+  // Create the IK service client
+  auto client = node->create_client<moveit_msgs::srv::GetPositionIK>("/compute_ik");
   
-  // set goal tolerances
-  move_group.setGoalOrientationTolerance(0.1);  // [rad]
-  move_group.setGoalPositionTolerance(0.01);    // [m]
-  move_group.setGoalJointTolerance(0.01);       // [rad]
-
+  // Wait for service to be available
+  if (!client->wait_for_service(std::chrono::seconds(5))) {
+    RCLCPP_ERROR(logger, "Service /compute_ik not available after waiting");
+    return false;
+  }
+  
+  // Create the request
+  auto request = std::make_shared<moveit_msgs::srv::GetPositionIK::Request>();
+  
+  // Set up the request with the current joint values for the seed state
+  request->ik_request.group_name = "ur5_arm";
+  
+  // Define joint names in the order MoveIt expects them
+  std::vector<std::string> joint_names = {
+    "shoulder_pan_joint", "shoulder_lift_joint", "elbow_joint", 
+    "wrist_1_joint", "wrist_2_joint", "wrist_3_joint"
+  };
+  
+  // Try to get current joint values directly using the MoveGroupInterface
+  std::vector<double> current_joint_values = move_group.getCurrentJointValues();
+  
+  if (current_joint_values.size() == 6) {
+    RCLCPP_INFO(logger, "Using current joint values as seed state");
+    
+    // Fill in the request with the current joint values
+    request->ik_request.robot_state.joint_state.name = joint_names;
+    request->ik_request.robot_state.joint_state.position = current_joint_values;
+    
+    // Log the seed values
+    RCLCPP_INFO(logger, "Seed state - Shoulder pan: %.4f, Shoulder lift: %.4f, Elbow: %.4f, Wrist1: %.4f, Wrist2: %.4f, Wrist3: %.4f", 
+               current_joint_values[0], current_joint_values[1], current_joint_values[2], 
+               current_joint_values[3], current_joint_values[4], current_joint_values[5]);
+  } else {
+    RCLCPP_ERROR(logger, "Failed to get current joint values (got %zu values, expected 6)", current_joint_values.size());
+    RCLCPP_INFO(logger, "Using ready pose values as seed state instead");
+    
+    // Use the ready_pose values as seed
+    request->ik_request.robot_state.joint_state.name = joint_names;
+    request->ik_request.robot_state.joint_state.position.resize(6);
+    
+    request->ik_request.robot_state.joint_state.position[0] = ready_pose.at("shoulder_pan_joint");
+    request->ik_request.robot_state.joint_state.position[1] = ready_pose.at("shoulder_lift_joint");
+    request->ik_request.robot_state.joint_state.position[2] = ready_pose.at("elbow_joint");
+    request->ik_request.robot_state.joint_state.position[3] = ready_pose.at("wrist_1_joint");
+    request->ik_request.robot_state.joint_state.position[4] = ready_pose.at("wrist_2_joint");
+    request->ik_request.robot_state.joint_state.position[5] = ready_pose.at("wrist_3_joint");
+    
+    RCLCPP_INFO(logger, "Seed state from ready pose - Shoulder pan: %.4f, Shoulder lift: %.4f, Elbow: %.4f, Wrist1: %.4f, Wrist2: %.4f, Wrist3: %.4f", 
+               request->ik_request.robot_state.joint_state.position[0], 
+               request->ik_request.robot_state.joint_state.position[1],
+               request->ik_request.robot_state.joint_state.position[2], 
+               request->ik_request.robot_state.joint_state.position[3],
+               request->ik_request.robot_state.joint_state.position[4], 
+               request->ik_request.robot_state.joint_state.position[5]);
+  }
+  
   // Set the pose target
-  move_group.setPoseTarget(target_pose);
+  request->ik_request.pose_stamped.header.frame_id = "world";
+  request->ik_request.pose_stamped.pose = target_pose;
   
-  // Plan and execute
-  moveit::planning_interface::MoveGroupInterface::Plan plan;
-  bool success = static_cast<bool>(move_group.plan(plan));
+  // Set timeout
+  request->ik_request.timeout.sec = 1;
+  request->ik_request.timeout.nanosec = 0;
   
-  if (success)
-  {
-    RCLCPP_INFO(logger, "planning succeeded! executing plan...");
-    
-    // Clear previous recorded states and start new recording
-    {
-      std::lock_guard<std::mutex> lock(joint_state_mutex);
-      recorded_states.clear();
-      recording_complete = false;
-    }
-    
-    // Execute the plan
-    moveit::core::MoveItErrorCode execution_result = move_group.execute(plan);
-    if (execution_result == moveit::core::MoveItErrorCode::SUCCESS) {
-      RCLCPP_INFO(logger, "execution completed successfully");
-      
-      // Wait a short time for the last joint states to be recorded
-      rclcpp::sleep_for(std::chrono::milliseconds(500));
-      
-      // Stop recording
-      {
-        std::lock_guard<std::mutex> lock(joint_state_mutex);
-        recording_complete = true;
-      }
-      joint_state_cv.notify_all();
-      
-      // Save both planned and actual trajectories
-      saveTrajectoryToCSV(plan.trajectory_, recorded_states, planning_algorithm, logger);
-    } else {
-      RCLCPP_ERROR(logger, "execution failed with error code: %d", execution_result.val);
-      return false;
-    }
+  // Call IK service
+  auto result_future = client->async_send_request(request);
+  
+  // Wait for the result
+  if (rclcpp::spin_until_future_complete(node, result_future) != rclcpp::FutureReturnCode::SUCCESS) {
+    RCLCPP_ERROR(logger, "Failed to call service /compute_ik");
+    return false;
   }
-  else
-  {
-    RCLCPP_ERROR(logger, "planning failed!");
+  
+  auto result = result_future.get();
+  
+  // Check if IK succeeded
+  if (result->error_code.val != moveit_msgs::msg::MoveItErrorCodes::SUCCESS) {
+    RCLCPP_ERROR(logger, "IK computation failed with error code: %d", result->error_code.val);
+    return false;
   }
-  return success;
+  
+  // Extract joint values
+  std::map<std::string, double> target_joint_values;
+  for (size_t i = 0; i < result->solution.joint_state.name.size(); ++i) {
+    target_joint_values[result->solution.joint_state.name[i]] = result->solution.joint_state.position[i];
+    RCLCPP_INFO(logger, "Joint %s: %.4f", result->solution.joint_state.name[i].c_str(), 
+               result->solution.joint_state.position[i]);
+  }
+  
+  RCLCPP_INFO(logger, "IK solution found, planning motion to target joint configuration");
+  
+  // Plan and execute with the IK solution
+  return plan_and_execute(move_group, target_joint_values, logger, planning_algorithm, planning_time);
 }
 
 int main(int argc, char* argv[])
@@ -250,7 +292,7 @@ int main(int argc, char* argv[])
   std::shared_ptr<tf2_ros::TransformListener> tf_listener = 
     std::make_shared<tf2_ros::TransformListener>(*tf_buffer);
 
-  // Create joint state subscriber
+  // Joint state subscriber for trajectory recording
   auto joint_state_sub = node->create_subscription<sensor_msgs::msg::JointState>(
       "/joint_states", 10,
       [](const sensor_msgs::msg::JointState::SharedPtr msg) {
@@ -260,10 +302,16 @@ int main(int argc, char* argv[])
           }
       });
 
+  // Allow time for ROS connections to establish
+  RCLCPP_INFO(logger, "Initializing...");
+  rclcpp::sleep_for(std::chrono::seconds(1));
+
+  // Initialize MoveGroupInterface
   using moveit::planning_interface::MoveGroupInterface;
   auto move_group_interface = MoveGroupInterface(node, "ur5_arm");
+  RCLCPP_INFO(logger, "MoveGroup interface initialized");
 
-  // define poses
+  // Define poses
   const std::map<std::string, double> home_pose = {
       {"elbow_joint", 0.0},
       {"shoulder_lift_joint", -1.57},
@@ -272,17 +320,6 @@ int main(int argc, char* argv[])
       {"wrist_2_joint", 0.0},
       {"wrist_3_joint", 0.0}
   };
-
-  /*
-      <group_state name="ready" group="ur5_arm">
-        <joint name="elbow_joint" value="1.267"/>
-        <joint name="shoulder_lift_joint" value="-2.1869"/>
-        <joint name="shoulder_pan_joint" value="0"/>
-        <joint name="wrist_1_joint" value="-0.6596"/>
-        <joint name="wrist_2_joint" value="-1.57"/>
-        <joint name="wrist_3_joint" value="0"/>
-    </group_state>
-  */
 
   const std::map<std::string, double> ready_pose = {
       {"elbow_joint", 1.267},
@@ -302,7 +339,7 @@ int main(int argc, char* argv[])
       {"wrist_3_joint", 0.0698132}
   };
 
-  RCLCPP_INFO(logger, "starting motion planning sequence with RRT*...");
+  RCLCPP_INFO(logger, "Starting motion planning sequence with RRT*...");
 
   // Wait for transforms to be available
   RCLCPP_INFO(logger, "Waiting for transforms to become available...");
@@ -313,26 +350,49 @@ int main(int argc, char* argv[])
   
   try {
     // Look up the transform from world to arm_insertion_point
-    geometry_msgs::msg::TransformStamped transform_stamped;
-    transform_stamped = tf_buffer->lookupTransform("world", "leg_insertion_point", 
-                                                  tf2::TimePointZero);
+    // geometry_msgs::msg::TransformStamped transform_stamped;
+    // transform_stamped = tf_buffer->lookupTransform("world", "arm_insertion_point", 
+    //                                               tf2::TimePointZero);
     
     // Convert the transform to a pose
-    target_pose.position.x = transform_stamped.transform.translation.x;
-    target_pose.position.y = transform_stamped.transform.translation.y;
-    target_pose.position.z = transform_stamped.transform.translation.z;
+    // target_pose.position.x = transform_stamped.transform.translation.x;
+    // target_pose.position.y = transform_stamped.transform.translation.y;
+    // target_pose.position.z = transform_stamped.transform.translation.z;
     
+    // // Set a suitable orientation for needle insertion
+    // target_pose.orientation = rpy_to_quaternion(-3.14, 0.0, -1.57);
 
-    target_pose.orientation = transform_stamped.transform.rotation;
+    target_pose.position.x = 0.082;
+    target_pose.position.y = 0.109;
+    target_pose.position.z = 0.670;
+    
+    // Set a suitable orientation for needle insertion
+    target_pose.orientation.x = -0.702;
+    target_pose.orientation.y = 0.712;
+    target_pose.orientation.z = -0.005;
+    target_pose.orientation.w = 0.011;
     
     RCLCPP_INFO(logger, "Planning to arm insertion point at: [%f, %f, %f]", 
                target_pose.position.x, target_pose.position.y, target_pose.position.z);
     
-    // Call the pose-based planning function
-    bool pose_success = plan_and_execute(move_group_interface, target_pose, logger, "RRTstar");
+    // First, move to the ready pose to ensure we start from a known configuration
+    // RCLCPP_INFO(logger, "Moving to ready pose first...");
+    // bool ready_success = plan_and_execute(move_group_interface, ready_pose, logger, "RRTstar");
+    // if (!ready_success) {
+    //   RCLCPP_ERROR(logger, "Failed to move to ready pose");
+    //   return 1;
+    // }
     
-    if (!pose_success) {
-      RCLCPP_ERROR(logger, "Failed to execute pose-based planning to arm insertion point");
+    // Add delay to ensure robot controller has fully updated its state
+    // RCLCPP_INFO(logger, "Waiting for robot to stabilize and update state...");
+    // rclcpp::sleep_for(std::chrono::seconds(2));
+    
+    // Then use IK to plan to the target pose
+    RCLCPP_INFO(logger, "Now planning to target pose...");
+    bool target_success = compute_ik_and_execute(node, move_group_interface, target_pose, logger, ready_pose, "RRTstar");
+    
+    if (!target_success) {
+      RCLCPP_ERROR(logger, "Failed to execute planning to arm insertion point");
     }
   } catch (const tf2::TransformException& ex) {
     RCLCPP_ERROR(logger, "Could not transform from 'world' to 'arm_insertion_point': %s", ex.what());
