@@ -239,7 +239,7 @@ bool compute_ik_and_execute(std::shared_ptr<rclcpp::Node> node,
   request->ik_request.pose_stamped.pose = target_pose;
   
   // Set timeout
-  request->ik_request.timeout.sec = 1;
+  request->ik_request.timeout.sec = 3;
   request->ik_request.timeout.nanosec = 0;
   
   // Call IK service

@@ -9,12 +9,19 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(moveit_ros_planning_interface REQUIRED)
+find_package(ament_cmake_python REQUIRED)
 
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 install(DIRECTORY launch worlds
   DESTINATION share/${PROJECT_NAME})
+
+# Install Python scripts
+install(PROGRAMS
+  scripts/python/collision_publisher.py
+  DESTINATION lib/${PROJECT_NAME}
+)
 
 add_executable(move_ur5 scripts/cpp/move_ur5.cpp)
 ament_target_dependencies(move_ur5 rclcpp moveit_ros_planning_interface)

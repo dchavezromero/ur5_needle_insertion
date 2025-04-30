@@ -60,13 +60,58 @@ def generate_launch_description():
             moveit_config.joint_limits,
         ],
     )   
-    # Static TF
+    # Static TF for robot base
     static_tf = Node(
         package="tf2_ros",
         executable="static_transform_publisher",
         name="static_transform_publisher",
         output="log",
         arguments=["--frame-id", "world", "--child-frame-id", "base_link"],
+    )
+
+    # Static TF for patient -- but need to figure out how to manually align crap w/ spawn locations
+    patient_tf = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="patient_tf",
+        output="log",
+        arguments=["0.94", "0.0", "0.0", "0.0", "0.0", "-1.57", "world", "elderMalePatient"],
+    )
+
+    # Static TF for bedside table
+    bedside_table_tf = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="bedside_table_tf",
+        output="log",
+        arguments=["0.0", "0.0", "0.0", "0.0", "0.0", "0.0", "world", "bedsideTable"],
+    )
+
+    # Static TF for bed table
+    bed_table_tf = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="bed_table_tf",
+        output="log",
+        arguments=["0.855", "-1.383", "0.0", "0.0", "0.0", "0.0", "world", "bedTable"],
+    )
+
+    # Static TF for operating scrubs
+    op_scrubs_tf = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="op_scrubs_tf",
+        output="log",
+        arguments=["0.127641", "-0.716872", "0.0", "0.0", "0.0", "0.0", "world", "opScrubs"],
+    )
+
+    # Static TF for divider
+    divider_tf = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="divider_tf",
+        output="log",
+        arguments=["0.0", "0.0", "0.0", "0.0", "0.0", "1.57", "world", "divider"],
     )
 
     # Publish TF
@@ -214,6 +259,14 @@ def generate_launch_description():
         output='screen'
     )
 
+    # Add collision publisher node
+    collision_publisher = Node(
+        package='path_planning',
+        executable='collision_publisher.py',
+        name='collision_publisher',
+        output='screen'
+    )
+
     return LaunchDescription([
         # RegisterEventHandler(
         #     event_handler=OnProcessExit(
@@ -237,6 +290,11 @@ def generate_launch_description():
             spawn_side_table,
             rviz_node,
             static_tf,
+            patient_tf,
+            bedside_table_tf,
+            bed_table_tf,
+            op_scrubs_tf,
+            divider_tf,
             run_move_group_node,
             ros2_control_node,
             joint_state_broadcaster_spawner,
@@ -244,6 +302,7 @@ def generate_launch_description():
             patient_static_tf,
             leg_insertion_tf,
             arm_insertion_tf,
+            collision_publisher,
         ])
 
     # return LaunchDescription([
