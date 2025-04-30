@@ -451,7 +451,6 @@
       <child>leg_insertion_point</child>
       <pose>0 0 0 0 0 0</pose>
     </joint>
-    -->
 
     <!--
     <link name="neck1_insertion_point">
