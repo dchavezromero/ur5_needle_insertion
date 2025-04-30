@@ -143,10 +143,37 @@ def generate_launch_description():
         arguments=[
             '-file', os.path.join(get_package_share_directory("hospital_models"), "models/ElderMalePatient/model.sdf"),
             '-entity', 'elderMalePatient',
-            '-x', '0.84', '-y', '0', '-z', '0',
+            '-x', '0.94', '-y', '0', '-z', '0',
             '-Y', '-1.57'  # Apply a -1.57 radian yaw rotation
         ],
         output='screen'
+    )
+
+    # Add static transform for patient position
+    patient_static_tf = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="patient_broadcaster",
+        output="log",
+        arguments=["0.94", "0", "0", "-1.57", "0", "0", "world", "elderMalePatient"]
+    )
+    
+    # Add static transform for the arm_insertion_point relative to patient
+    arm_insertion_tf = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="arm_insertion_broadcaster",
+        output="log",
+        arguments=["-0.4", "-0.35", "0.85", "0", "0", "1.57", "elderMalePatient", "arm_insertion_point"]
+    )
+    
+    # Add static transform for the leg_insertion_point relative to patient
+    leg_insertion_tf = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="leg_insertion_broadcaster",
+        output="log",
+        arguments=["0.45", "0.05", "1.0", "0", "0", "0", "elderMalePatient", "leg_insertion_point"]
     )
 
     spawn_side_table = Node(
@@ -214,7 +241,9 @@ def generate_launch_description():
             ros2_control_node,
             joint_state_broadcaster_spawner,
             arm_controller_spawner,
-            # hand_controller_spawner,
+            patient_static_tf,
+            leg_insertion_tf,
+            arm_insertion_tf,
         ])
 
     # return LaunchDescription([
