@@ -28,10 +28,10 @@ class CollisionPublisher(Node):
         # Models to publish (these need to match the static TF frames we set up in our launch file, to be less spammy)
         self.models = [
             ('elderMalePatient', 'ElderMalePatient/meshes/ElderMalePatient.obj'),
-            # ('bedsideTable', 'BedsideTable/meshes/BedsideTable_Col.obj'),
-            # ('bedTable', 'BedTable/meshes/BedTable_Col.obj'),
+             ('bedsideTable', 'BedsideTable/meshes/BedsideTable_Col.obj'),
+             ('bedTable', 'BedTable/meshes/BedTable_Col.obj'),
             # ('opScrubs', 'OpScrubs/meshes/OpScrubs_Col.obj'),
-            ('divider', 'ElderMalePatient/meshes/Divider.stl')
+            # ('divider', 'ElderMalePatient/meshes/Divider.stl')
         ]
         
         # Get models path
