@@ -1,6 +1,7 @@
 <?xml version="1.0" ?>
 <sdf version="1.5" xmlns:xacro="http://ros.org/wiki/xacro">
   <model name="ElderMalePatient">
+    <static>true</static>
     <xacro:macro name="cylinder_inertia" params="m r h">
       <inertial>
         <pose>0 0 0 ${pi/2} 0 0</pose>
@@ -450,7 +451,6 @@
       <child>leg_insertion_point</child>
       <pose>0 0 0 0 0 0</pose>
     </joint>
-    -->
 
     <!--
     <link name="neck1_insertion_point">
