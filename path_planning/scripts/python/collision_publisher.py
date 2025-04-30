@@ -25,12 +25,12 @@ class CollisionPublisher(Node):
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
         
-        # Models to publish
+        # Models to publish (these need to match the static TF frames we set up in our launch file, to be less spammy)
         self.models = [
             ('elderMalePatient', 'ElderMalePatient/meshes/ElderMalePatient.obj'),
-            ('bedsideTable', 'BedsideTable/meshes/BedsideTable_Col.obj'),
-            ('bedTable', 'BedTable/meshes/BedTable_Col.obj'),
-            ('opScrubs', 'OpScrubs/meshes/OpScrubs_Col.obj'),
+            # ('bedsideTable', 'BedsideTable/meshes/BedsideTable_Col.obj'),
+            # ('bedTable', 'BedTable/meshes/BedTable_Col.obj'),
+            # ('opScrubs', 'OpScrubs/meshes/OpScrubs_Col.obj'),
             ('divider', 'ElderMalePatient/meshes/Divider.stl')
         ]
         

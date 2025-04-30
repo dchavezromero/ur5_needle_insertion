@@ -79,31 +79,22 @@ def generate_launch_description():
     )
 
     # Static TF for bedside table
-    bedside_table_tf = Node(
-        package="tf2_ros",
-        executable="static_transform_publisher",
-        name="bedside_table_tf",
-        output="log",
-        arguments=["0.0", "0.0", "0.0", "0.0", "0.0", "0.0", "world", "bedsideTable"],
-    )
-
-    # Static TF for bed table
-    bed_table_tf = Node(
-        package="tf2_ros",
-        executable="static_transform_publisher",
-        name="bed_table_tf",
-        output="log",
-        arguments=["0.855", "-1.383", "0.0", "0.0", "0.0", "0.0", "world", "bedTable"],
-    )
+    # bedside_table_tf = Node(
+    #     package="tf2_ros",
+    #     executable="static_transform_publisher",
+    #     name="bedside_table_tf",
+    #     output="log",
+    #     arguments=["0.0", "0.0", "0.0", "0.0", "0.0", "0.0", "world", "bedsideTable"],
+    # )
 
     # Static TF for operating scrubs
-    op_scrubs_tf = Node(
-        package="tf2_ros",
-        executable="static_transform_publisher",
-        name="op_scrubs_tf",
-        output="log",
-        arguments=["0.127641", "-0.716872", "0.0", "0.0", "0.0", "0.0", "world", "opScrubs"],
-    )
+    # op_scrubs_tf = Node(
+    #     package="tf2_ros",
+    #     executable="static_transform_publisher",
+    #     name="op_scrubs_tf",
+    #     output="log",
+    #     arguments=["0.127641", "-0.716872", "0.0", "0.0", "0.0", "0.0", "world", "opScrubs"],
+    # )
 
     # Static TF for divider
     divider_tf = Node(
@@ -111,7 +102,8 @@ def generate_launch_description():
         executable="static_transform_publisher",
         name="divider_tf",
         output="log",
-        arguments=["0.0", "0.0", "0.0", "0.0", "0.0", "1.57", "world", "divider"],
+        #         arguments=["0.94", "0", "0", "-1.57", "0", "0", "world", "elderMalePatient"]
+        arguments=["0.94", "0.0", "0.0", "0.0", "0.0", "0.0", "world", "divider"],
     )
 
     # Publish TF
@@ -254,7 +246,7 @@ def generate_launch_description():
         arguments=[
             '-topic', '/robot_description',
             '-entity', 'ur5',
-            '-x', '0', '-y', '0', '-z', '0.895'  # Adjust based on table height
+            '-x', '0', '-y', '0', '-z', '0'  # Adjust based on table height (NOTE: moved this to URDF offset instead for now)
         ],
         output='screen'
     )
@@ -291,9 +283,8 @@ def generate_launch_description():
             rviz_node,
             static_tf,
             patient_tf,
-            bedside_table_tf,
-            bed_table_tf,
-            op_scrubs_tf,
+            # bedside_table_tf,
+            # op_scrubs_tf,
             divider_tf,
             run_move_group_node,
             ros2_control_node,
