@@ -1,0 +1,14 @@
+# Request - parameters for the motion planning
+string target_frame      # The target TF frame to move to (e.g., "torso7_insertion_point")
+string planning_algorithm # The planning algorithm to use (e.g., "RRTstar", "RRTConnect", etc.)
+float32 planning_timeout # Timeout in seconds for the planning phase
+bool execute_plan        # Whether to execute the plan after successful planning
+
+---
+
+# Response - results of the planning and execution
+bool success             # Whether the overall operation was successful
+string message           # Human-readable message about the result
+float32 planning_time    # Time (seconds) taken to plan the motion
+int32 trajectory_points  # Number of points in the planned trajectory
+float32 trajectory_time  # Expected execution time of the trajectory (seconds) 

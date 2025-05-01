@@ -262,6 +262,20 @@ def generate_launch_description():
         name='collision_publisher',
         output='screen'
     )
+
+    data_recorder = Node(
+        package='path_planning',
+        executable='data_recorder',
+        name='data_recorder',
+        output='screen'
+    )
+
+    motion_planning_service = Node(
+        package='path_planning',
+        executable='motion_planning_service',
+        name='motion_planning_service',
+        output='screen'
+    )
     
     # Create launch description with all the nodes
     return LaunchDescription([
@@ -299,5 +313,7 @@ def generate_launch_description():
         rviz_node,
         
         # Collision Detection
-        collision_publisher
+        collision_publisher,
+        data_recorder,
+        motion_planning_service
     ])

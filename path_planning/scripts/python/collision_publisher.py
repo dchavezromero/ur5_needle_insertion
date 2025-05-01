@@ -47,35 +47,35 @@ class CollisionPublisher(Node):
         Periodically publishes collision objects to the planning scene.
         Loads meshes, gets their poses from TF, and publishes them as collision objects.
         """
-        self.get_logger().info('Starting to publish collision objects...')
+        # self.get_logger().info('Starting to publish collision objects...')
         scene = PlanningScene()
         scene.is_diff = True
         
         for name, mesh_path in self.models:
             try:
-                self.get_logger().info(f'Processing {name}...')
+                # self.get_logger().info(f'Processing {name}...')
                 
                 # Get transform
-                self.get_logger().info(f'Looking up transform from world to {name}')
+                # self.get_logger().info(f'Looking up transform from world to {name}')
                 try:
                     transform = self.tf_buffer.lookup_transform('world', name, rclpy.time.Time())
-                    self.get_logger().info(f'Got transform for {name}: {transform}')
+                    # self.get_logger().info(f'Got transform for {name}: {transform}')
                 except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
-                    self.get_logger().warn(f'Could not get transform for {name}: {str(e)}')
+                    # self.get_logger().warn(f'Could not get transform for {name}: {str(e)}')
                     continue
                 
                 # Load and convert mesh
                 full_path = os.path.join(self.models_path, mesh_path)
-                self.get_logger().info(f'Loading mesh from {full_path}')
+                # self.get_logger().info(f'Loading mesh from {full_path}')
                 mesh = trimesh.load(full_path)
                 
                 if isinstance(mesh, trimesh.Scene):
-                    self.get_logger().info(f'{name} is a Scene object, combining all meshes')
+                    # self.get_logger().info(f'{name} is a Scene object, combining all meshes')
                     # Combine all meshes in the scene into one
                     combined_mesh = trimesh.util.concatenate(list(mesh.geometry.values()))
                     mesh = combined_mesh
                 
-                self.get_logger().info(f'Mesh loaded: {len(mesh.vertices)} vertices, {len(mesh.faces)} faces')
+                # self.get_logger().info(f'Mesh loaded: {len(mesh.vertices)} vertices, {len(mesh.faces)} faces')
                 
                 # Create collision object
                 co = CollisionObject()
@@ -109,14 +109,14 @@ class CollisionPublisher(Node):
                 co.operation = CollisionObject.ADD
                 
                 scene.world.collision_objects.append(co)
-                self.get_logger().info(f'Added collision object for {name} to planning scene')
+                # self.get_logger().info(f'Added collision object for {name} to planning scene')
                 
             except Exception as e:
                 self.get_logger().error(f'Error processing {name}: {str(e)}')
         
-        self.get_logger().info(f'Publishing planning scene with {len(scene.world.collision_objects)} collision objects')
+        # self.get_logger().info(f'Publishing planning scene with {len(scene.world.collision_objects)} collision objects')
         self.planning_scene_pub.publish(scene)
-        self.get_logger().info('Planning scene published')
+        # self.get_logger().info('Planning scene published')
 
 def main(args=None):
     rclpy.init(args=args)
