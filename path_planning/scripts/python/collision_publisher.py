@@ -28,9 +28,9 @@ class CollisionPublisher(Node):
         # Models to publish (these need to match the static TF frames we set up in our launch file, to be less spammy)
         self.models = [
             ('elderMalePatient', 'ElderMalePatient/meshes/ElderMalePatient.obj'),
-             ('bedsideTable', 'BedsideTable/meshes/BedsideTable_Col.obj'),
-             ('bedTable', 'BedTable/meshes/BedTable_Col.obj'),
-            # ('opScrubs', 'OpScrubs/meshes/OpScrubs_Col.obj'),
+            ('bedsideTable', 'BedsideTable/meshes/BedsideTable.obj'),
+            ('bedTable', 'BedTable/meshes/BedTable.obj'),
+            ('opScrubs', 'OpScrubs/meshes/OpScrubs.obj'),
             # ('divider', 'ElderMalePatient/meshes/Divider.stl')
         ]
         
@@ -70,8 +70,10 @@ class CollisionPublisher(Node):
                 mesh = trimesh.load(full_path)
                 
                 if isinstance(mesh, trimesh.Scene):
-                    self.get_logger().info(f'{name} is a Scene object, extracting first mesh')
-                    mesh = list(mesh.geometry.values())[0]
+                    self.get_logger().info(f'{name} is a Scene object, combining all meshes')
+                    # Combine all meshes in the scene into one
+                    combined_mesh = trimesh.util.concatenate(list(mesh.geometry.values()))
+                    mesh = combined_mesh
                 
                 self.get_logger().info(f'Mesh loaded: {len(mesh.vertices)} vertices, {len(mesh.faces)} faces')
                 

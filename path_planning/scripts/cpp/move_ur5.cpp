@@ -92,9 +92,9 @@ bool compute_ik_and_plan(
   move_group.setMaxAccelerationScalingFactor(0.5);
   
   // Set goal tolerances
-  move_group.setGoalOrientationTolerance(0.1);  // [rad]
-  move_group.setGoalPositionTolerance(0.01);    // [m]
-  move_group.setGoalJointTolerance(0.01);       // [rad]
+  move_group.setGoalOrientationTolerance(0.01);  // [rad]
+  move_group.setGoalPositionTolerance(0.001);    // [m]
+  move_group.setGoalJointTolerance(0.001);       // [rad]
   
   // Set the pose target directly
   move_group.setPoseTarget(target_pose);
@@ -221,13 +221,13 @@ int main(int argc, char * argv[])
               // Try getting a transform from TF if we have valid joint values
               if (!has_valid_target_pose) {
                 target_pose = get_pose_from_tf(tf_buffer.get(), node, "world", "torso7_insertion_point");
-                target_pose.position.z += 0.12; // Account for needle length
+                target_pose.position.z += 0.10; // Account for needle length
                 
                 // Looking down the needle
-                target_pose.orientation.x = -0.707;
-                target_pose.orientation.y = 0.707;
-                target_pose.orientation.z = -0.005;
-                target_pose.orientation.w = 0.007;
+                // target_pose.orientation.x = -0.707;
+                // target_pose.orientation.y = 0.707;
+                // target_pose.orientation.z = -0.005;
+                // target_pose.orientation.w = 0.007;
                 
                 RCLCPP_INFO(node->get_logger(), "Target pose acquired at [%.3f, %.3f, %.3f]",
                            target_pose.position.x, target_pose.position.y, target_pose.position.z);
