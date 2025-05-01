@@ -9,6 +9,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(moveit_ros_planning_interface REQUIRED)
+find_package(ament_cmake_python REQUIRED)
 
 # uncomment the following section in order to fill in
 # further dependencies manually.
@@ -16,10 +17,24 @@ find_package(moveit_ros_planning_interface REQUIRED)
 install(DIRECTORY launch worlds
   DESTINATION share/${PROJECT_NAME})
 
-add_executable(move_ur5 scripts/cpp/move_ur5.cpp)
-ament_target_dependencies(move_ur5 rclcpp moveit_ros_planning_interface)
+# Install Python scripts
+install(PROGRAMS
+  scripts/python/collision_publisher.py
+  DESTINATION lib/${PROJECT_NAME}
+)
 
-install(TARGETS move_ur5
+add_executable(move_ur5 scripts/cpp/move_ur5.cpp)
+ament_target_dependencies(move_ur5 
+  rclcpp 
+  moveit_ros_planning_interface
+)
+
+add_executable(data_recorder scripts/cpp/data_recorder.cpp)
+ament_target_dependencies(data_recorder
+  rclcpp
+  moveit_ros_planning_interface
+)
+install(TARGETS move_ur5 data_recorder
   DESTINATION lib/${PROJECT_NAME}
 )
 if(BUILD_TESTING)

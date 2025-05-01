@@ -6,7 +6,8 @@ from launch import LaunchDescription
 from launch.actions import ExecuteProcess, IncludeLaunchDescription, RegisterEventHandler
 from launch.event_handlers import (OnProcessStart, OnProcessExit)
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-import launch.substitutions
+from launch.actions import TimerAction
+
 
 from launch_ros.actions import Node
 
@@ -60,13 +61,57 @@ def generate_launch_description():
             moveit_config.joint_limits,
         ],
     )   
-    # Static TF
-    static_tf = Node(
+    # static_tf = Node(
+    #     package="tf2_ros",
+    #     executable="static_transform_publisher",
+    #     name="static_transform_publisher",
+    #     output="log",
+    #     arguments=["0", "0", "0", "0", "0", "0", "world", "base_link"],
+    # )
+    # Static TF for robot base
+    # static_tf = Node(
+    #     package="tf2_ros",
+    #     executable="static_transform_publisher",
+    #     name="static_transform_publisher",
+    #     output="log",
+    #     arguments=["--frame-id", "world", "--child-frame-id", "base_link"],
+    # )
+
+    # Static TF for patient -- but need to figure out how to manually align crap w/ spawn locations
+    # patient_tf = Node(
+    #     package="tf2_ros",
+    #     executable="static_transform_publisher",
+    #     name="patient_tf",
+    #     output="log",
+    #     arguments=["0.94", "0.0", "0.0", "0.0", "0.0", "-1.57", "world", "elderMalePatient"],
+    # )
+
+    # Static TF for bedside table
+    # bedside_table_tf = Node(
+    #     package="tf2_ros",
+    #     executable="static_transform_publisher",
+    #     name="bedside_table_tf",
+    #     output="log",
+    #     arguments=["0.0", "0.0", "0.0", "0.0", "0.0", "0.0", "world", "bedsideTable"],
+    # )
+
+    # Static TF for operating scrubs
+    # op_scrubs_tf = Node(
+    #     package="tf2_ros",
+    #     executable="static_transform_publisher",
+    #     name="op_scrubs_tf",
+    #     output="log",
+    #     arguments=["0.127641", "-0.716872", "0.0", "0.0", "0.0", "0.0", "world", "opScrubs"],
+    # )
+
+    # Static TF for divider
+    divider_tf = Node(
         package="tf2_ros",
         executable="static_transform_publisher",
-        name="static_transform_publisher",
+        name="divider_tf",
         output="log",
-        arguments=["--frame-id", "world", "--child-frame-id", "base_link"],
+        #         arguments=["0.94", "0", "0", "-1.57", "0", "0", "world", "elderMalePatient"]
+        arguments=["0.94", "0.0", "0.0", "0.0", "0.0", "0.0", "world", "divider"],
     )
 
     # Publish TF
@@ -137,6 +182,15 @@ def generate_launch_description():
         output='screen'
     )
 
+    # Add static transform for table
+    table_static_tf = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="table_broadcaster",
+        output="log",
+        arguments=["0", "0", "0", "0", "0", "0", "world", "bedsideTable"]
+    )
+
     spawn_patient = Node(
         package='gazebo_ros',
         executable='spawn_entity.py',
@@ -147,6 +201,41 @@ def generate_launch_description():
             '-Y', '-1.57'  # Apply a -1.57 radian yaw rotation
         ],
         output='screen'
+    )
+
+    # Add static transform for patient position
+    patient_static_tf = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="patient_broadcaster",
+        output="log",
+        arguments=["0.94", "0", "0", "0", "0", "-0.7071068", "0.7071068", "world", "elderMalePatient"]
+    )
+    
+    torso7_insertion_tf = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="torso7_insertion_broadcaster",
+        output="log",
+        arguments=["-0.15", "-0.1", "0.975", "0", "0", "0", "elderMalePatient", "torso7_insertion_point"]
+    )
+
+    # Add static transform for the arm_insertion_point relative to patient
+    arm_insertion_tf = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="arm_insertion_broadcaster",
+        output="log",
+    arguments=["-0.4", "-0.35", "0.85", "1.57", "0", "0", "elderMalePatient", "arm_insertion_point"]
+    )
+    
+    # Add static transform for the leg_insertion_point relative to patient
+    leg_insertion_tf = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="leg_insertion_broadcaster",
+        output="log",
+        arguments=["0.45", "0.05", "1.0", "0", "0", "0", "elderMalePatient", "leg_insertion_point"]
     )
 
     spawn_side_table = Node(
@@ -170,51 +259,51 @@ def generate_launch_description():
         ],
         output='screen'
     )
-    # spawn_entity = Node(package='gazebo_ros', executable='spawn_entity.py',
-    #                     arguments=['-topic', '/robot_description',
-    #                                '-entity', 'ur5'],
-    #                     output='screen')
 
-   # Spawn the UR5 on top of the table
+    # Spawn the UR5 on top of the table
     spawn_ur5 = Node(
         package='gazebo_ros',
         executable='spawn_entity.py',
         arguments=[
             '-topic', '/robot_description',
             '-entity', 'ur5',
-            '-x', '0', '-y', '0', '-z', '0.895'  # Adjust based on table height
+            '-x', '0', '-y', '0', '-z', '0'  # Adjust based on table height (NOTE: moved this to URDF offset instead for now)
         ],
         output='screen'
     )
 
-    return LaunchDescription([
-        # RegisterEventHandler(
-        #     event_handler=OnProcessExit(
-        #     target_action=spawn_entity,
-        #     on_exit=[load_joint_state_controller],
-        #     )
-        # ),
+    # Add collision publisher node
+    collision_publisher = Node(
+        package='path_planning',
+        executable='collision_publisher.py',
+        name='collision_publisher',
+        output='screen'
+    )
 
-        # RegisterEventHandler(
-        #     event_handler=OnProcessExit(
-        #         target_action=load_joint_state_controller,
-        #         on_exit=[load_arm_controller],
-        #     )
-        # ),
+    return LaunchDescription([
             gazebo,
             robot_state_publisher,
+            # static_tf,
             spawn_table,
             spawn_ur5,
             spawn_patient,
             spawn_surgeon,
             spawn_side_table,
             rviz_node,
-            static_tf,
+            # patient_tf,
+            # bedside_table_tf,
+            # op_scrubs_tf,
+            divider_tf,
             run_move_group_node,
             ros2_control_node,
             joint_state_broadcaster_spawner,
             arm_controller_spawner,
-            # hand_controller_spawner,
+            patient_static_tf,
+            leg_insertion_tf,
+            arm_insertion_tf,
+            collision_publisher,
+            torso7_insertion_tf,
+            table_static_tf
         ])
 
     # return LaunchDescription([
