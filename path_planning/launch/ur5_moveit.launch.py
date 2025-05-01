@@ -207,18 +207,18 @@ def generate_launch_description():
     )
     
     # === Medical Insertion Points ===
-    torso6_insertion_tf = Node(
+    torso_insertion_tf = Node(
         package="tf2_ros",
         executable="static_transform_publisher",
-        name="torso6_insertion_broadcaster",
+        name="torso_insertion_broadcaster",
         output="log",
-        arguments=[str(-0.3), str(-0.1), str(1.0 + needle_gap), str(0.0), str(3.14), str(0.0), "elderMalePatient", "torso6_insertion_point"]
+        arguments=[str(-0.3), str(-0.1), str(1.0 + needle_gap), str(0.0), str(3.14), str(0.0), "elderMalePatient", "torso_insertion_point"]
     )
     # Torso insertion point
-    torso7_insertion_tf = Node(
+    torso2_insertion_tf = Node(
         package="tf2_ros",
         executable="static_transform_publisher",
-        name="torso7_insertion_broadcaster",
+        name="torso2_insertion_broadcaster",
         output="log",
         arguments=[str(-0.15), str(-0.1), str(0.975 + needle_gap), str(0.0), str(3.14), str(0.0), "elderMalePatient", "torso7_insertion_point"]
     )
@@ -231,14 +231,38 @@ def generate_launch_description():
         output="log",
         arguments=[str(-0.4), str(-0.35 - needle_gap), str(0.85), str(1.57), str(1.57), str(0.0), "elderMalePatient", "arm_insertion_point"]
     )
-    
+
+    arm2_insertion_tf = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="arm2_insertion_broadcaster",
+        output="log",
+        arguments=[str(-0.365), str(-0.25 - needle_gap), str(0.975), str(1.57), str(1.57), str(0.0), "elderMalePatient", "arm2_insertion_point"]
+    )
+
+    arm3_insertion_tf = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="arm3_insertion_broadcaster",
+        output="log",
+        arguments=[str(-0.50), str(-0.275 - needle_gap), str(0.9), str(1.57), str(1.57), str(0.0), "elderMalePatient", "arm3_insertion_point"]
+    )
+
     # Leg insertion point
     leg_insertion_tf = Node(
         package="tf2_ros",
         executable="static_transform_publisher",
         name="leg_insertion_broadcaster",
         output="log",
-        arguments=["0.45", "0.05", "1.0", "0", "0", "0", "elderMalePatient", "leg_insertion_point"]
+        arguments=[str(0.25), str(-0.125), str(0.9 + needle_gap), str(0), str(3.14), str(0), "elderMalePatient", "leg_insertion_point"]
+    )
+
+    leg2_insertion_tf = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="leg2_insertion_broadcaster",
+        output="log",
+        arguments=[str(0.25), str(-0.2 - needle_gap), str(0.85), str(1.57), str(1.57), str(0), "elderMalePatient", "leg2_insertion_point"]
     )
     
     # === Robot ===
@@ -298,11 +322,13 @@ def generate_launch_description():
         divider_tf,
         
         # Insertion Points
-        torso6_insertion_tf,
-        torso7_insertion_tf,
+        torso_insertion_tf,
+        torso2_insertion_tf,
         arm_insertion_tf,
+        arm2_insertion_tf,
+        arm3_insertion_tf,
         leg_insertion_tf,
-        
+        leg2_insertion_tf,
         # Planning & Control
         run_move_group_node,
         ros2_control_node,
