@@ -115,6 +115,7 @@ def generate_launch_description():
     )
     
     # === Hospital Environment Objects ===
+    needle_gap = 0.10
     # 1. Bedside Table
     spawn_table = Node(
         package='gazebo_ros',
@@ -206,13 +207,20 @@ def generate_launch_description():
     )
     
     # === Medical Insertion Points ===
+    torso6_insertion_tf = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="torso6_insertion_broadcaster",
+        output="log",
+        arguments=[str(-0.3), str(-0.1), str(1.0 + needle_gap), str(0.0), str(3.14), str(0.0), "elderMalePatient", "torso6_insertion_point"]
+    )
     # Torso insertion point
     torso7_insertion_tf = Node(
         package="tf2_ros",
         executable="static_transform_publisher",
         name="torso7_insertion_broadcaster",
         output="log",
-        arguments=["-0.15", "-0.1", "0.975", "0", "3.14", "0", "elderMalePatient", "torso7_insertion_point"]
+        arguments=[str(-0.15), str(-0.1), str(0.975 + needle_gap), str(0.0), str(3.14), str(0.0), "elderMalePatient", "torso7_insertion_point"]
     )
     
     # Arm insertion point
@@ -221,7 +229,7 @@ def generate_launch_description():
         executable="static_transform_publisher",
         name="arm_insertion_broadcaster",
         output="log",
-        arguments=["-0.4", "-0.35", "0.85", "1.57", "0", "0", "elderMalePatient", "arm_insertion_point"]
+        arguments=[str(-0.4), str(-0.35 - needle_gap), str(0.85), str(1.57), str(1.57), str(0.0), "elderMalePatient", "arm_insertion_point"]
     )
     
     # Leg insertion point
@@ -276,6 +284,7 @@ def generate_launch_description():
         divider_tf,
         
         # Insertion Points
+        torso6_insertion_tf,
         torso7_insertion_tf,
         arm_insertion_tf,
         leg_insertion_tf,
