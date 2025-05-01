@@ -31,7 +31,7 @@ class CollisionPublisher(Node):
             ('bedsideTable', 'BedsideTable/meshes/BedsideTable.obj'),
             ('bedTable', 'BedTable/meshes/BedTable.obj'),
             ('opScrubs', 'OpScrubs/meshes/OpScrubs.obj'),
-            # ('divider', 'ElderMalePatient/meshes/Divider.stl')
+            ('divider', 'ElderMalePatient/meshes/Divider.stl')
         ]
         
         # Get models path

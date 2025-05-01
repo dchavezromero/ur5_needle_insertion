@@ -220,7 +220,7 @@ int main(int argc, char * argv[])
               
               // Try getting a transform from TF if we have valid joint values
               if (!has_valid_target_pose) {
-                target_pose = get_pose_from_tf(tf_buffer.get(), node, "world", "torso6_insertion_point");
+                target_pose = get_pose_from_tf(tf_buffer.get(), node, "world", "torso7_insertion_point");
                 // target_pose.position.z += 0.10; // Account for needle length
                 
                 RCLCPP_INFO(node->get_logger(), "Target pose acquired at [%.3f, %.3f, %.3f]",
