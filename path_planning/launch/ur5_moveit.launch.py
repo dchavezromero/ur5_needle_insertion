@@ -115,7 +115,7 @@ def generate_launch_description():
     )
     
     # === Hospital Environment Objects ===
-    needle_gap = 0.12
+    needle_gap = 0.11
     # 1. Bedside Table
     spawn_table = Node(
         package='gazebo_ros',
