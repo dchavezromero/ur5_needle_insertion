@@ -1,0 +1,9 @@
+# Request - parameters for starting the recording
+float32 planning_time   # Time (seconds) taken to plan the motion
+string target_frame     # The target frame being used (e.g., "torso_insertion_point")
+
+---
+
+# Response - result of the start recording request
+bool success            # Whether the recording was successfully started
+string message          # Human-readable message about the result 

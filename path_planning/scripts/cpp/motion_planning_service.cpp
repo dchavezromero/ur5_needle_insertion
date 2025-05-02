@@ -12,6 +12,7 @@
 #include <std_srvs/srv/trigger.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
 #include "path_planning/srv/plan_motion.hpp"
+#include "path_planning/srv/start_recording.hpp"
 
 using namespace std::chrono_literals;
 
@@ -36,7 +37,7 @@ public:
                 std::placeholders::_1, std::placeholders::_2));
     
     // Create clients for data recorder services
-    start_recording_client_ = this->create_client<std_srvs::srv::Trigger>("start_recording");
+    start_recording_client_ = this->create_client<path_planning::srv::StartRecording>("start_recording");
     stop_recording_client_ = this->create_client<std_srvs::srv::Trigger>("stop_recording");
     
     // Initialize MoveGroupInterface with a retry mechanism
@@ -294,11 +295,16 @@ private:
         if (request->execute_plan) {
           // Start recording data before execution
           if (start_recording_client_->service_is_ready()) {
-            auto request = std::make_shared<std_srvs::srv::Trigger::Request>();
-            RCLCPP_INFO(this->get_logger(), "Starting data recording before trajectory execution...");
+            auto recording_request = std::make_shared<path_planning::srv::StartRecording::Request>();
+            recording_request->planning_time = response->planning_time;
+            recording_request->target_frame = request->target_frame;
             
-            start_recording_client_->async_send_request(request,
-              [this](rclcpp::Client<std_srvs::srv::Trigger>::SharedFuture future) {
+            RCLCPP_INFO(this->get_logger(), "Starting data recording before trajectory execution...");
+            RCLCPP_INFO(this->get_logger(), "Planning time: %.3f seconds, Target frame: %s", 
+                       response->planning_time, request->target_frame.c_str());
+            
+            start_recording_client_->async_send_request(recording_request,
+              [this](rclcpp::Client<path_planning::srv::StartRecording>::SharedFuture future) {
                 auto result = future.get();
                 if (result->success) {
                   RCLCPP_INFO(this->get_logger(), "Data recording started: %s", result->message.c_str());
@@ -364,7 +370,7 @@ private:
   // Service, subscribers and clients
   rclcpp::Service<path_planning::srv::PlanMotion>::SharedPtr planning_service_;
   rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_state_sub_;
-  rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr start_recording_client_;
+  rclcpp::Client<path_planning::srv::StartRecording>::SharedPtr start_recording_client_;
   rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr stop_recording_client_;
   rclcpp::TimerBase::SharedPtr init_timer_;
   

@@ -18,6 +18,7 @@ find_package(tf2_geometry_msgs REQUIRED)
 # Generate custom services
 rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/PlanMotion.srv"
+  "srv/StartRecording.srv"
   DEPENDENCIES std_msgs
 )
 

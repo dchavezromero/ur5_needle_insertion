@@ -340,6 +340,6 @@ def generate_launch_description():
         
         # Collision Detection
         collision_publisher,
-        data_recorder,
-        motion_planning_service
+        #data_recorder,
+        #motion_planning_service
     ])

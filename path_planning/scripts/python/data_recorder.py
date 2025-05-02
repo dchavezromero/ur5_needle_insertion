@@ -10,6 +10,7 @@ import threading
 import datetime
 import os
 from builtin_interfaces.msg import Time
+from path_planning.srv import StartRecording
 
 
 class DataRecorder(Node):
@@ -26,6 +27,10 @@ class DataRecorder(Node):
         self.recording = False
         self.recorded_states = []
         self.recording_lock = threading.Lock()
+        
+        # Planning metrics
+        self.planning_time = 0.0
+        self.target_frame = ""
         
         # Get use_sim_time parameter
         use_sim_time = self.get_parameter('use_sim_time').value
@@ -48,7 +53,7 @@ class DataRecorder(Node):
         
         # Create services
         self.start_recording_service = self.create_service(
-            Trigger,
+            StartRecording,
             'start_recording',
             self.start_recording_callback
         )
@@ -75,21 +80,30 @@ class DataRecorder(Node):
             self.recorded_states.clear()
             self.recording = True
             
-        self.get_logger().info('Started recording joint states')
+            # Store planning information
+            self.planning_time = request.planning_time
+            self.target_frame = request.target_frame
+            
+            self.get_logger().info(f'Started recording joint states for target {self.target_frame}. Planning time: {self.planning_time:.3f}s')
+            
         response.success = True
         response.message = 'Recording started'
         return response
     
     def stop_recording_callback(self, request, response):
         states_copy = []
+        planning_time = 0.0
+        target_frame = ""
         
         with self.recording_lock:
             self.recording = False
             states_copy = list(self.recorded_states)
+            planning_time = self.planning_time
+            target_frame = self.target_frame
         
         # Save the recorded data
         if states_copy:
-            self.save_joint_states_to_csv(states_copy)
+            self.save_joint_states_to_csv(states_copy, planning_time, target_frame)
             self.get_logger().info(f'Stopped recording and saved {len(states_copy)} joint states')
             response.success = True
             response.message = 'Recording stopped and data saved'
@@ -104,13 +118,15 @@ class DataRecorder(Node):
         now = datetime.datetime.now()
         return now.strftime("%Y%m%d_%H%M%S")
     
-    def save_joint_states_to_csv(self, joint_states):
+    def save_joint_states_to_csv(self, joint_states, planning_time, target_frame):
         if not joint_states:
             self.get_logger().warn('No joint states recorded, skipping CSV generation')
             return
         
         timestamp = self.get_current_timestamp()
-        filename = f'joint_trajectory_{timestamp}.csv'
+        # Include target frame in filename for better organization
+        target_name = target_frame.split('/')[-1] if '/' in target_frame else target_frame
+        filename = f'joint_trajectory_{target_name}_{timestamp}.csv'
         
         # List of joints we're interested in
         joint_names = [
@@ -121,6 +137,13 @@ class DataRecorder(Node):
         try:
             with open(filename, 'w', newline='') as csv_file:
                 csv_writer = csv.writer(csv_file)
+                
+                # Write metadata as comments
+                csv_writer.writerow(['# Recording timestamp:', timestamp])
+                csv_writer.writerow(['# Target frame:', target_frame])
+                csv_writer.writerow(['# Planning time (s):', f'{planning_time:.6f}'])
+                csv_writer.writerow(['# Total recorded points:', len(joint_states)])
+                csv_writer.writerow([])  # Empty row for better readability
                 
                 # Write header
                 header = ['time'] + joint_names
