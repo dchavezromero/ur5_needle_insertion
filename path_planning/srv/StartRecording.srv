@@ -1,6 +1,7 @@
 # Request - parameters for starting the recording
 float32 planning_time   # Time (seconds) taken to plan the motion
 string target_frame     # The target frame being used (e.g., "torso_insertion_point")
+string planning_algorithm # The planning algorithm used (e.g., "RRTConnect", "PRM")
 
 ---
 

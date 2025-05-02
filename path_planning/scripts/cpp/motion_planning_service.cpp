@@ -298,10 +298,11 @@ private:
             auto recording_request = std::make_shared<path_planning::srv::StartRecording::Request>();
             recording_request->planning_time = response->planning_time;
             recording_request->target_frame = request->target_frame;
+            recording_request->planning_algorithm = request->planning_algorithm;  // Pass the planner name
             
             RCLCPP_INFO(this->get_logger(), "Starting data recording before trajectory execution...");
-            RCLCPP_INFO(this->get_logger(), "Planning time: %.3f seconds, Target frame: %s", 
-                       response->planning_time, request->target_frame.c_str());
+            RCLCPP_INFO(this->get_logger(), "Planning time: %.3f seconds, Target frame: %s, Planner: %s", 
+                       response->planning_time, request->target_frame.c_str(), request->planning_algorithm.c_str());
             
             start_recording_client_->async_send_request(recording_request,
               [this](rclcpp::Client<path_planning::srv::StartRecording>::SharedFuture future) {

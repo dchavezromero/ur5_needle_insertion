@@ -220,7 +220,7 @@ def generate_launch_description():
         executable="static_transform_publisher",
         name="torso2_insertion_broadcaster",
         output="log",
-        arguments=[str(-0.15), str(-0.1), str(0.975 + needle_gap), str(0.0), str(3.14), str(0.0), "elderMalePatient", "torso7_insertion_point"]
+        arguments=[str(-0.15), str(-0.1), str(0.975 + needle_gap), str(0.0), str(3.14), str(0.0), "elderMalePatient", "torso2_insertion_point"]
     )
     
     # Arm insertion point
@@ -287,6 +287,13 @@ def generate_launch_description():
         output='screen'
     )
 
+    velocity_tracker = Node(
+        package='path_planning',
+        executable='ee_velocity_tracker',
+        name='ee_velocity_tracker',
+        output='screen'
+    )
+
     data_recorder = Node(
         package='path_planning',
         executable='data_recorder.py',
@@ -340,6 +347,7 @@ def generate_launch_description():
         
         # Collision Detection
         collision_publisher,
-        #data_recorder,
-        #motion_planning_service
+        velocity_tracker,
+        data_recorder,
+        motion_planning_service
     ])

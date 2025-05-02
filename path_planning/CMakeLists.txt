@@ -54,6 +54,24 @@ install(TARGETS
   DESTINATION lib/${PROJECT_NAME}
 )
 
+# Add the ee_velocity_tracker executable
+add_executable(ee_velocity_tracker
+  scripts/cpp/ee_velocity_tracker.cpp
+)
+ament_target_dependencies(ee_velocity_tracker
+  rclcpp
+  sensor_msgs
+  geometry_msgs
+  tf2_ros
+  tf2_geometry_msgs
+)
+
+# Install the executable
+install(TARGETS
+  ee_velocity_tracker
+  DESTINATION lib/${PROJECT_NAME}/
+)
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   # the following line skips the linter which checks for copyrights
