@@ -3,51 +3,59 @@
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
-from sensor_msgs.msg import JointState
-from geometry_msgs.msg import TwistStamped
-from std_srvs.srv import Trigger
-import threading
+import numpy as np
 import datetime
 import os
-import numpy as np
+import threading
+
+# ROS message imports
+from sensor_msgs.msg import JointState
+from geometry_msgs.msg import TwistStamped, TransformStamped
+from std_srvs.srv import Trigger
 from builtin_interfaces.msg import Time
 from path_planning.srv import StartRecording
+import tf2_ros
+
+# Visualization imports
 import matplotlib
 matplotlib.use('Agg')  # Use non-interactive backend
 import matplotlib.pyplot as plt
 plt.ioff()  # Turn off interactive mode
 from matplotlib.gridspec import GridSpec
 from mpl_toolkits.mplot3d import Axes3D
-import tf2_ros
-from geometry_msgs.msg import TransformStamped
 
 
 class DataRecorder(Node):
+    """
+    Records joint trajectories and end-effector movement data for analysis.
+    Provides services to start/stop recording and generates visualizations.
+    """
     def __init__(self):
         super().__init__('data_recorder')
-
+        
+        # Initialize parameters
+        self._init_parameters()
+        
+        # Initialize state variables
+        self._init_state()
+        
+        # Set up TF for getting end-effector position
+        self._setup_tf()
+        
+        # Set up subscribers, services, and timers
+        self._setup_subscribers()
+        self._setup_services()
+        self._setup_timers()
+        
+        self.get_logger().info('Data recorder ready. Use services to start/stop recording.')
+    
+    def _init_parameters(self):
+        """Initialize node parameters"""
         # Declare parameters if they don't already exist
         try:
             self.declare_parameter('use_sim_time', True)
         except Exception as e:
             self.get_logger().info(f'Parameter use_sim_time already declared: {e}')
-        
-        # State variables
-        self.recording = False
-        self.recorded_states = []
-        self.recorded_ee_poses = []  # Store end-effector poses
-        self.recorded_ee_velocities = []  # Store end-effector velocities
-        self.ee_velocity_count = 0  # Counter for velocity messages
-        self.recording_lock = threading.Lock()
-        
-        # TF buffer for getting end-effector position
-        self.tf_buffer = tf2_ros.Buffer()
-        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
-        
-        # Planning metrics
-        self.planning_time = 0.0
-        self.target_frame = ""
-        self.current_planner = "Unknown"  # Store the current planner name
         
         # Visualization parameters
         self.declare_parameter('show_plots', True)
@@ -57,7 +65,28 @@ class DataRecorder(Node):
         use_sim_time = self.get_parameter('use_sim_time').value
         self.get_logger().info(f'Data Recorder Node Initialized with use_sim_time={use_sim_time}')
         self.get_logger().info(f'Plot visualization is {"enabled" if self.show_plots else "disabled"}')
+    
+    def _init_state(self):
+        """Initialize state variables for recording data"""
+        self.recording = False
+        self.recorded_states = []
+        self.recorded_ee_poses = []
+        self.recorded_ee_velocities = []
+        self.ee_velocity_count = 0
+        self.recording_lock = threading.Lock()
         
+        # Planning metrics
+        self.planning_time = 0.0
+        self.target_frame = ""
+        self.current_planner = "Unknown"
+    
+    def _setup_tf(self):
+        """Set up TF buffer for transforms"""
+        self.tf_buffer = tf2_ros.Buffer()
+        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
+    
+    def _setup_subscribers(self):
+        """Set up subscribers for joint states and EE velocity"""
         # Create QoS profile for sensor data
         sensor_qos = QoSProfile(
             reliability=QoSReliabilityPolicy.BEST_EFFORT,
@@ -80,8 +109,9 @@ class DataRecorder(Node):
             self.ee_velocity_callback,
             sensor_qos
         )
-        
-        # Create services
+    
+    def _setup_services(self):
+        """Set up services for starting and stopping recording"""
         self.start_recording_service = self.create_service(
             StartRecording,
             'start_recording',
@@ -93,14 +123,15 @@ class DataRecorder(Node):
             'stop_recording',
             self.stop_recording_callback
         )
-        
-        # Timer for getting EE position during recording
-        self.ee_timer = self.create_timer(0.005, self.get_ee_pose)  # 200Hz
-        self.ee_timer.cancel()  # Start disabled
-        
-        self.get_logger().info('Data recorder ready. Use services to start/stop recording.')
     
+    def _setup_timers(self):
+        """Set up timers for periodic operations"""
+        # Timer for getting EE position during recording (200Hz)
+        self.ee_timer = self.create_timer(0.005, self.get_ee_pose)
+        self.ee_timer.cancel()  # Start disabled
+
     def joint_state_callback(self, msg):
+        """Callback for joint state messages"""
         with self.recording_lock:
             if self.recording:
                 self.recorded_states.append(msg)
@@ -113,8 +144,8 @@ class DataRecorder(Node):
         """Callback for end-effector velocity messages"""
         with self.recording_lock:
             if self.recording:
-                # Store the most recent velocity
-                self.latest_ee_velocity = msg
+                # Store the velocity
+                self.recorded_ee_velocities.append(msg)
                 
                 # Count for logging
                 self.ee_velocity_count += 1
@@ -127,7 +158,7 @@ class DataRecorder(Node):
             return
             
         try:
-            # Get transform from world to EE (wrist_3_link is the last link in UR5)
+            # Get transform from world to needle
             transform = self.tf_buffer.lookup_transform(
                 'world', 
                 'needle',
@@ -138,25 +169,24 @@ class DataRecorder(Node):
             with self.recording_lock:
                 self.recorded_ee_poses.append(transform)
                 
-                # If we have a latest velocity reading, store it with each pose
-                if hasattr(self, 'latest_ee_velocity'):
-                    self.recorded_ee_velocities.append(self.latest_ee_velocity)
-                
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
             self.get_logger().warn(f'Failed to get EE transform: {e}')
     
     def start_recording_callback(self, request, response):
+        """Service callback to start recording data"""
         with self.recording_lock:
+            # Clear previous data
             self.recorded_states.clear()
             self.recorded_ee_poses.clear()
             self.recorded_ee_velocities.clear()
+            self.ee_velocity_count = 0
+            
+            # Start recording
             self.recording = True
             
             # Store planning information
             self.planning_time = request.planning_time
             self.target_frame = request.target_frame
-            
-            # Store planner name if available
             self.current_planner = request.planning_algorithm if hasattr(request, 'planning_algorithm') else "Unknown"
             
             # Start the EE timer
@@ -170,39 +200,48 @@ class DataRecorder(Node):
         return response
     
     def stop_recording_callback(self, request, response):
+        """Service callback to stop recording and process data"""
         states_copy = []
         ee_poses_copy = []
         ee_velocities_copy = []
         planning_time = 0.0
         target_frame = ""
+        current_planner = ""
         
         with self.recording_lock:
+            # Stop recording
             self.recording = False
+            
+            # Make copies of data for processing
             states_copy = list(self.recorded_states)
             ee_poses_copy = list(self.recorded_ee_poses)
             ee_velocities_copy = list(self.recorded_ee_velocities)
+            
+            # Get planning info
             planning_time = self.planning_time
             target_frame = self.target_frame
+            current_planner = self.current_planner
             
             # Stop the EE timer
             self.ee_timer.cancel()
         
         # Process and visualize the recorded data
         if states_copy:
-            timestamp = self.get_current_timestamp()
-            # Process the data first
-            processed_data = self.process_joint_data(states_copy, planning_time, target_frame, timestamp)
+            timestamp = self._get_current_timestamp()
             
-            # Process EE data
-            processed_ee_data = self.process_ee_data(ee_poses_copy, ee_velocities_copy, planning_time, target_frame, timestamp)
+            # Process the joint and EE data
+            processed_joint_data = self._process_joint_data(states_copy, planning_time, target_frame, current_planner, timestamp)
+            processed_ee_data = self._process_ee_data(ee_poses_copy, ee_velocities_copy, planning_time, target_frame, current_planner, timestamp)
             
-            # Visualize the data if enabled
+            # Generate visualizations if enabled
             if self.show_plots:
-                self.visualize_joint_data(processed_data)
+                if processed_joint_data:
+                    self._visualize_joint_data(processed_joint_data)
                 if processed_ee_data:
-                    self.visualize_ee_data(processed_ee_data)
+                    self._visualize_ee_data(processed_ee_data)
             
-            self.get_logger().info(f'Stopped recording and processed {len(states_copy)} joint states, {len(ee_poses_copy)} EE poses, and {len(ee_velocities_copy)} EE velocity messages')
+            self.get_logger().info(f'Stopped recording and processed {len(states_copy)} joint states, '
+                                   f'{len(ee_poses_copy)} EE poses, and {len(ee_velocities_copy)} EE velocity messages')
             response.success = True
             response.message = 'Recording stopped and data processed'
         else:
@@ -212,11 +251,12 @@ class DataRecorder(Node):
         
         return response
     
-    def get_current_timestamp(self):
+    def _get_current_timestamp(self):
+        """Get formatted timestamp string for filenames"""
         now = datetime.datetime.now()
         return now.strftime("%Y%m%d_%H%M%S")
     
-    def process_joint_data(self, joint_states, planning_time, target_frame, timestamp):
+    def _process_joint_data(self, joint_states, planning_time, target_frame, planner_name, timestamp):
         """Process the joint data to extract positions, velocities, and accelerations"""
         if not joint_states or len(joint_states) < 2:
             self.get_logger().warn('Not enough joint states recorded to process data')
@@ -229,12 +269,9 @@ class DataRecorder(Node):
         ]
         
         try:
-            # Check if velocities are available in the messages
-            has_velocity_data = False
+            # Check first joint state message
             first_state = joint_states[0]
-                
-            if hasattr(first_state, 'velocity') and len(first_state.velocity) > 0:
-                has_velocity_data = True
+            has_velocity_data = hasattr(first_state, 'velocity') and len(first_state.velocity) > 0
             
             # Get indices of the joints we're interested in
             joint_indices = []
@@ -260,9 +297,7 @@ class DataRecorder(Node):
             for state in joint_states:
                 # Calculate time relative to the first message in seconds
                 time_secs = (state.header.stamp.sec - start_sec) + ((state.header.stamp.nanosec - start_nsec) * 1e-9)
-                # Handle negative time that might occur due to precision errors
-                if time_secs < 0:
-                    time_secs = 0.0
+                time_secs = max(0.0, time_secs)  # Handle negative time due to precision errors
                 timestamps.append(time_secs)
                 
                 # Extract positions
@@ -273,54 +308,29 @@ class DataRecorder(Node):
                         positions[i].append(float('nan'))
             
             # Calculate or extract velocities
-            if has_velocity_data:
-                # Extract velocities from messages
-                for i, state in enumerate(joint_states):
-                    for j, idx in enumerate(joint_indices):
+            for j in range(len(joint_indices)):
+                # Extract or calculate velocities
+                if has_velocity_data:
+                    # Extract from messages
+                    for state in joint_states:
+                        idx = joint_indices[j]
                         if idx < len(state.velocity):
                             velocities[j].append(state.velocity[idx])
                         else:
                             velocities[j].append(0.0)
-            else:
-                # Calculate velocities from position differences
-                for j in range(len(joint_indices)):
-                    # First point has zero velocity
-                    velocities[j].append(0.0)
-                    
-                    # Calculate velocities for remaining points
-                    for i in range(1, len(timestamps)):
-                        dt = timestamps[i] - timestamps[i-1]
-                        if dt > 0 and not np.isnan(positions[j][i]) and not np.isnan(positions[j][i-1]):
-                            vel = (positions[j][i] - positions[j][i-1]) / dt
-                            velocities[j].append(vel)
-                        else:
-                            velocities[j].append(0.0)
-            
-            # Calculate accelerations from velocity differences
-            for j in range(len(joint_indices)):
-                # First point has zero acceleration
-                accelerations[j].append(0.0)
+                else:
+                    # Calculate from positions (without smoothing)
+                    self._calculate_velocities(positions[j], timestamps, velocities[j])
                 
-                # Calculate accelerations for remaining points
-                for i in range(1, len(timestamps)):
-                    dt = timestamps[i] - timestamps[i-1]
-                    if dt > 0:
-                        accel = (velocities[j][i] - velocities[j][i-1]) / dt
-                        accelerations[j].append(accel)
-                    else:
-                        accelerations[j].append(0.0)
-            
-            # Try to extract the planner name from the target frame
-            planner_name = "Unknown"
-            if hasattr(self, 'current_planner') and self.current_planner:
-                planner_name = self.current_planner
+                # Calculate accelerations from velocities
+                self._calculate_accelerations(velocities[j], timestamps, accelerations[j])
             
             # Return processed data
             return {
                 'timestamp': timestamp,
                 'target_frame': target_frame,
                 'planning_time': planning_time,
-                'planner': planner_name,  # Add planner info 
+                'planner': planner_name,
                 'joint_names': joint_names,
                 'timestamps': timestamps,
                 'positions': positions,
@@ -333,7 +343,7 @@ class DataRecorder(Node):
             self.get_logger().error(f'Failed to process joint data: {str(e)}')
             return None
     
-    def process_ee_data(self, ee_poses, ee_velocities, planning_time, target_frame, timestamp):
+    def _process_ee_data(self, ee_poses, ee_velocities, planning_time, target_frame, planner_name, timestamp):
         """Process EE pose data to extract positions, velocities, and final position error"""
         if not ee_poses or len(ee_poses) < 2:
             self.get_logger().warn('Not enough EE poses recorded to process data')
@@ -350,17 +360,12 @@ class DataRecorder(Node):
             positions_x = []
             positions_y = []
             positions_z = []
-            velocities_x = []
-            velocities_y = []
-            velocities_z = []
             
             # Extract timestamps and positions from all poses
-            for i, pose in enumerate(ee_poses):
+            for pose in ee_poses:
                 # Calculate time relative to the first message in seconds
                 time_secs = (pose.header.stamp.sec - start_sec) + ((pose.header.stamp.nanosec - start_nsec) * 1e-9)
-                # Handle negative time that might occur due to precision errors
-                if time_secs < 0:
-                    time_secs = 0.0
+                time_secs = max(0.0, time_secs)  # Handle negative time due to precision errors
                 timestamps.append(time_secs)
                 
                 # Extract positions
@@ -368,164 +373,33 @@ class DataRecorder(Node):
                 positions_y.append(pose.transform.translation.y)
                 positions_z.append(pose.transform.translation.z)
             
-            # First extract the raw velocity data
-            raw_vel_times = []
-            raw_vel_x = []
-            raw_vel_y = []
-            raw_vel_z = []
-            
-            for vel_msg in ee_velocities:
-                vel_time = (vel_msg.header.stamp.sec - start_sec) + ((vel_msg.header.stamp.nanosec - start_nsec) * 1e-9)
-                if vel_time < 0:
-                    vel_time = 0.0
-                
-                raw_vel_times.append(vel_time)
-                raw_vel_x.append(vel_msg.twist.linear.x)
-                raw_vel_y.append(vel_msg.twist.linear.y)
-                raw_vel_z.append(vel_msg.twist.linear.z)
-            
-            # Apply a simple moving average to smooth the velocity data
-            def moving_average(data, window_size=15):  # Increased window size from 5 to 15
-                if len(data) < window_size:
-                    return data
-                
-                smoothed = []
-                for i in range(len(data)):
-                    start_idx = max(0, i - window_size // 2)
-                    end_idx = min(len(data), i + window_size // 2 + 1)
-                    window = data[start_idx:end_idx]
-                    smoothed.append(sum(window) / len(window))
-                return smoothed
-            
-            # Only smooth if we have enough data
-            if len(raw_vel_x) >= 8:  # Updated to match window size
-                raw_vel_x = moving_average(raw_vel_x)
-                raw_vel_y = moving_average(raw_vel_y)
-                raw_vel_z = moving_average(raw_vel_z)
-                
-                # Apply a second pass to smooth even more
-                raw_vel_x = moving_average(raw_vel_x)
-                raw_vel_y = moving_average(raw_vel_y)
-                raw_vel_z = moving_average(raw_vel_z)
-            
-            # If we have velocity data, assign it to each pose timestamp
-            if raw_vel_times:
-                self.get_logger().info(f'Interpolating {len(raw_vel_times)} velocity measurements across {len(timestamps)} poses')
-                
-                # Create simple linear interpolator
-                def interpolate(x, x_data, y_data):
-                    # Find the insertion point for x in x_data
-                    if x <= x_data[0]:
-                        return y_data[0]
-                    if x >= x_data[-1]:
-                        return y_data[-1]
-                    
-                    # Find the closest points
-                    for i in range(len(x_data)-1):
-                        if x_data[i] <= x <= x_data[i+1]:
-                            # Linear interpolation
-                            t = (x - x_data[i]) / (x_data[i+1] - x_data[i])
-                            return y_data[i] * (1-t) + y_data[i+1] * t
-                    
-                    # Fallback if somehow we get here
-                    return y_data[-1]
-                
-                # Interpolate at each pose timestamp
-                for t in timestamps:
-                    velocities_x.append(interpolate(t, raw_vel_times, raw_vel_x))
-                    velocities_y.append(interpolate(t, raw_vel_times, raw_vel_y))
-                    velocities_z.append(interpolate(t, raw_vel_times, raw_vel_z))
-            else:
-                # No velocity data, use numerical differentiation as fallback
-                self.get_logger().info('No velocity measurements available. Using numerical differentiation as fallback.')
-                
-                for i in range(len(timestamps)):
-                    if i == 0:  # Forward difference for first point
-                        if len(timestamps) > 1:
-                            dt = timestamps[1] - timestamps[0]
-                            if dt > 0:
-                                vx = (positions_x[1] - positions_x[0]) / dt
-                                vy = (positions_y[1] - positions_y[0]) / dt
-                                vz = (positions_z[1] - positions_z[0]) / dt
-                            else:
-                                vx, vy, vz = 0.0, 0.0, 0.0
-                        else:
-                            vx, vy, vz = 0.0, 0.0, 0.0
-                    elif i == len(timestamps) - 1:  # Backward difference for last point
-                        dt = timestamps[i] - timestamps[i-1]
-                        if dt > 0:
-                            vx = (positions_x[i] - positions_x[i-1]) / dt
-                            vy = (positions_y[i] - positions_y[i-1]) / dt
-                            vz = (positions_z[i] - positions_z[i-1]) / dt
-                        else:
-                            vx, vy, vz = 0.0, 0.0, 0.0
-                    else:  # Central difference for interior points
-                        dt = timestamps[i+1] - timestamps[i-1]
-                        if dt > 0:
-                            vx = (positions_x[i+1] - positions_x[i-1]) / dt
-                            vy = (positions_y[i+1] - positions_y[i-1]) / dt
-                            vz = (positions_z[i+1] - positions_z[i-1]) / dt
-                        else:
-                            vx, vy, vz = 0.0, 0.0, 0.0
-                    
-                    velocities_x.append(vx)
-                    velocities_y.append(vy)
-                    velocities_z.append(vz)
+            # Process the velocity data from messages
+            velocities_x, velocities_y, velocities_z = self._process_velocity_data(
+                ee_velocities, timestamps, start_sec, start_nsec
+            )
             
             # Get target pose
-            target_pose = None
-            try:
-                target_transform = self.tf_buffer.lookup_transform(
-                    'world', 
-                    target_frame,
-                    rclpy.time.Time()
-                )
-                target_pose = {
-                    'x': target_transform.transform.translation.x,
-                    'y': target_transform.transform.translation.y,
-                    'z': target_transform.transform.translation.z
-                }
-                self.get_logger().info(f"Target pose: X={target_pose['x']:.4f}, Y={target_pose['y']:.4f}, Z={target_pose['z']:.4f}")
-            except Exception as e:
-                self.get_logger().warn(f'Could not get target pose: {e}')
-                target_pose = {
-                    'x': 0.0,
-                    'y': 0.0,
-                    'z': 0.0
-                }
+            target_pose = self._get_target_pose(target_frame)
             
-            # Calculate final position error analysis
+            # Calculate final position and error
             final_pos = {
                 'x': positions_x[-1] if positions_x else 0.0,
                 'y': positions_y[-1] if positions_y else 0.0,
                 'z': positions_z[-1] if positions_z else 0.0
             }
+            
+            position_error = self._calculate_position_error(final_pos, target_pose)
+            
             self.get_logger().info(f"Final position: X={final_pos['x']:.4f}, Y={final_pos['y']:.4f}, Z={final_pos['z']:.4f}")
-            
-            # Calculate direct differences and euclidean distance
-            position_error = {
-                'x': final_pos['x'] - target_pose['x'],  # Not absolute value - show actual error
-                'y': final_pos['y'] - target_pose['y'],
-                'z': final_pos['z'] - target_pose['z'],
-                'euclidean': np.sqrt(
-                    (final_pos['x'] - target_pose['x'])**2 +
-                    (final_pos['y'] - target_pose['y'])**2 +
-                    (final_pos['z'] - target_pose['z'])**2
-                )
-            }
-            self.get_logger().info(f"Position error: X={position_error['x']:.4f}, Y={position_error['y']:.4f}, Z={position_error['z']:.4f}, Euclidean={position_error['euclidean']:.4f}")
-            
-            # Try to extract the planner name from the target frame
-            planner_name = "Unknown"
-            if hasattr(self, 'current_planner') and self.current_planner:
-                planner_name = self.current_planner
+            self.get_logger().info(f"Position error: X={position_error['x']:.4f}, Y={position_error['y']:.4f}, "
+                                   f"Z={position_error['z']:.4f}, Euclidean={position_error['euclidean']:.4f}")
             
             # Return processed data
             return {
                 'timestamp': timestamp,
                 'target_frame': target_frame,
                 'planning_time': planning_time,
-                'planner': planner_name,  # Add planner info
+                'planner': planner_name,
                 'timestamps': timestamps,
                 'positions_x': positions_x,
                 'positions_y': positions_y,
@@ -543,7 +417,32 @@ class DataRecorder(Node):
             self.get_logger().error(f'Failed to process EE data: {str(e)}')
             return None
     
-    def visualize_joint_data(self, data):
+    def _process_velocity_data(self, velocity_msgs, pose_timestamps, start_sec, start_nsec):
+        """Process velocity messages without filtering - preserve raw data"""
+        # Extract the raw velocity data
+        raw_vel_times = []
+        raw_vel_x = []
+        raw_vel_y = []
+        raw_vel_z = []
+        
+        for vel_msg in velocity_msgs:
+            vel_time = (vel_msg.header.stamp.sec - start_sec) + ((vel_msg.header.stamp.nanosec - start_nsec) * 1e-9)
+            vel_time = max(0.0, vel_time)  # Handle negative time
+            
+            raw_vel_times.append(vel_time)
+            raw_vel_x.append(vel_msg.twist.linear.x)
+            raw_vel_y.append(vel_msg.twist.linear.y)
+            raw_vel_z.append(vel_msg.twist.linear.z)
+        
+        # Interpolate raw velocities at pose timestamps (no filtering)
+        velocities_x = self._interpolate_at_timestamps(pose_timestamps, raw_vel_times, raw_vel_x)
+        velocities_y = self._interpolate_at_timestamps(pose_timestamps, raw_vel_times, raw_vel_y)
+        velocities_z = self._interpolate_at_timestamps(pose_timestamps, raw_vel_times, raw_vel_z)
+        
+        self.get_logger().info(f'Processed {len(raw_vel_times)} raw velocity measurements')
+        return velocities_x, velocities_y, velocities_z
+    
+    def _visualize_joint_data(self, data):
         """Visualize the processed joint data using matplotlib"""
         if not data:
             self.get_logger().warn('No processed data available to visualize')
@@ -556,9 +455,8 @@ class DataRecorder(Node):
             
             # Add title with metadata
             target_name = data['target_frame'].split('/')[-1] if '/' in data['target_frame'] else data['target_frame']
-            planner_name = data.get('planner', 'Unknown')  # Get planner info with fallback
+            planner_name = data.get('planner', 'Unknown')
             
-            # Display planning time and target frame in the title
             plt.suptitle(f'Joint Trajectory Analysis - Planner: {planner_name}\n' + 
                          f'Target: {data["target_frame"]}\n' +
                          f'Planning Time: {data["planning_time"]:.3f}s, Trajectory Points: {data["total_points"]}',
@@ -567,7 +465,7 @@ class DataRecorder(Node):
             # Color palette for joints
             colors = ['b', 'g', 'r', 'c', 'm', 'y']
             
-            # Plot positions - left column, top row
+            # Plot positions - top left
             ax_pos = plt.subplot(gs[0, 0])
             for i, joint_name in enumerate(data['joint_names']):
                 ax_pos.plot(data['timestamps'], data['positions'][i], color=colors[i % len(colors)], 
@@ -578,7 +476,7 @@ class DataRecorder(Node):
             ax_pos.grid(True)
             ax_pos.legend(loc='best')
             
-            # Plot velocities - right column, top row
+            # Plot velocities - top right
             ax_vel = plt.subplot(gs[0, 1])
             for i, joint_name in enumerate(data['joint_names']):
                 ax_vel.plot(data['timestamps'], data['velocities'][i], color=colors[i % len(colors)], 
@@ -589,7 +487,7 @@ class DataRecorder(Node):
             ax_vel.grid(True)
             ax_vel.legend(loc='best')
             
-            # Plot accelerations - left column, bottom row
+            # Plot accelerations - bottom left
             ax_acc = plt.subplot(gs[1, 0])
             for i, joint_name in enumerate(data['joint_names']):
                 ax_acc.plot(data['timestamps'], data['accelerations'][i], color=colors[i % len(colors)], 
@@ -600,7 +498,7 @@ class DataRecorder(Node):
             ax_acc.grid(True)
             ax_acc.legend(loc='best')
             
-            # Calculate and plot path smoothness metrics - right column, bottom row
+            # Calculate and plot path smoothness metrics - bottom right
             ax_metrics = plt.subplot(gs[1, 1])
             
             # Calculate metrics for each joint
@@ -628,15 +526,15 @@ class DataRecorder(Node):
             # Save the figure
             plt_filename = f'trajectory_analysis_{target_name}_{data["timestamp"]}.png'
             plt.savefig(plt_filename, dpi=300, bbox_inches='tight')
-            self.get_logger().info(f'Saved visualization to {plt_filename}')
+            self.get_logger().info(f'Saved joint visualization to {plt_filename}')
             
-            # Close the figure to avoid memory leaks and hanging windows
+            # Close the figure to avoid memory leaks
             plt.close(fig)
         
         except Exception as e:
             self.get_logger().error(f'Failed to visualize joint data: {str(e)}')
     
-    def visualize_ee_data(self, data):
+    def _visualize_ee_data(self, data):
         """Visualize end-effector trajectory in 3D and position/velocity/accuracy graphs"""
         if not data:
             self.get_logger().warn('No processed end-effector data available to visualize')
@@ -648,7 +546,7 @@ class DataRecorder(Node):
             gs = GridSpec(2, 2, figure=fig)
             
             target_name = data['target_frame'].split('/')[-1] if '/' in data['target_frame'] else data['target_frame']
-            planner_name = data.get('planner', 'Unknown')  # Get planner info with fallback
+            planner_name = data.get('planner', 'Unknown')
             
             # Add title with metadata
             plt.suptitle(f'End-Effector Trajectory Analysis - Planner: {planner_name}\n' + 
@@ -657,144 +555,292 @@ class DataRecorder(Node):
                         fontsize=16)
             
             # 3D trajectory plot - top left
-            ax_3d = fig.add_subplot(gs[0, 0], projection='3d')
-            ax_3d.plot(data['positions_x'], data['positions_y'], data['positions_z'], 'b-', linewidth=2)
-            ax_3d.scatter(data['positions_x'][0], data['positions_y'][0], data['positions_z'][0], 
-                          color='g', s=100, label='Start')
-            ax_3d.scatter(data['positions_x'][-1], data['positions_y'][-1], data['positions_z'][-1], 
-                          color='r', s=100, label='End')
+            self._plot_3d_trajectory(fig, gs[0, 0], data)
             
-            # Plot target position if available
-            if data['target_pose']:
-                ax_3d.scatter(data['target_pose']['x'], data['target_pose']['y'], data['target_pose']['z'],
-                            color='m', s=100, label='Target')
-                
-                # Draw line from end position to target
-                ax_3d.plot([data['positions_x'][-1], data['target_pose']['x']],
-                           [data['positions_y'][-1], data['target_pose']['y']],
-                           [data['positions_z'][-1], data['target_pose']['z']],
-                           'r--', linewidth=1.5, label='Position Error')
-            
-            ax_3d.set_title('End-Effector 3D Trajectory')
-            ax_3d.set_xlabel('X (m)')
-            ax_3d.set_ylabel('Y (m)')
-            ax_3d.set_zlabel('Z (m)')
-            ax_3d.legend()
-            
-            # Make axis equal for better visualization
-            max_range = max([
-                max(data['positions_x']) - min(data['positions_x']),
-                max(data['positions_y']) - min(data['positions_y']),
-                max(data['positions_z']) - min(data['positions_z'])
-            ])
-            mid_x = (max(data['positions_x']) + min(data['positions_x'])) / 2
-            mid_y = (max(data['positions_y']) + min(data['positions_y'])) / 2
-            mid_z = (max(data['positions_z']) + min(data['positions_z'])) / 2
-            ax_3d.set_xlim(mid_x - max_range/2, mid_x + max_range/2)
-            ax_3d.set_ylim(mid_y - max_range/2, mid_y + max_range/2)
-            ax_3d.set_zlim(mid_z - max_range/2, mid_z + max_range/2)
-            
-            # Position plot with target comparison - top right
-            ax_pos = fig.add_subplot(gs[0, 1])
-            ax_pos.plot(data['timestamps'], data['positions_x'], 'r-', label='X')
-            ax_pos.plot(data['timestamps'], data['positions_y'], 'g-', label='Y')
-            ax_pos.plot(data['timestamps'], data['positions_z'], 'b-', label='Z')
-            
-            # Add target position lines if available
-            if data['target_pose']:
-                ax_pos.axhline(y=data['target_pose']['x'], color='r', linestyle='--', alpha=0.5, label='X Target')
-                ax_pos.axhline(y=data['target_pose']['y'], color='g', linestyle='--', alpha=0.5, label='Y Target')
-                ax_pos.axhline(y=data['target_pose']['z'], color='b', linestyle='--', alpha=0.5, label='Z Target')
-            
-            ax_pos.set_title('End-Effector Position')
-            ax_pos.set_xlabel('Time (s)')
-            ax_pos.set_ylabel('Position (m)')
-            ax_pos.grid(True)
-            ax_pos.legend()
+            # Position plot - top right
+            self._plot_position_data(fig, gs[0, 1], data)
             
             # Velocity plot - bottom left
-            ax_vel = fig.add_subplot(gs[1, 0])
-            ax_vel.plot(data['timestamps'], data['velocities_x'], 'r-', label='X')
-            ax_vel.plot(data['timestamps'], data['velocities_y'], 'g-', label='Y')
-            ax_vel.plot(data['timestamps'], data['velocities_z'], 'b-', label='Z')
-            
-            ax_vel.set_title('End-Effector Velocity')
-            ax_vel.set_xlabel('Time (s)')
-            ax_vel.set_ylabel('Velocity (m/s)')
-            ax_vel.grid(True)
-            ax_vel.legend()
+            self._plot_velocity_data(fig, gs[1, 0], data)
             
             # Position error - bottom right
-            ax_err = fig.add_subplot(gs[1, 1])
-            
-            # Create a bar chart for position errors - show actual errors (can be negative)
-            labels = ['X Error', 'Y Error', 'Z Error', 'Euclidean']
-            error_values = [
-                data['position_error']['x'],  # Signed error
-                data['position_error']['y'],
-                data['position_error']['z'],
-                data['position_error']['euclidean']
-            ]
-            
-            colors = ['red', 'green', 'blue', 'purple']
-            bars = ax_err.bar(labels, error_values, color=colors, alpha=0.7)
-            
-            # Add a horizontal line at zero
-            ax_err.axhline(y=0, color='k', linestyle='-', alpha=0.3)
-            
-            # Add a horizontal line indicating a 1cm error threshold
-            ax_err.axhline(y=0.01, color='r', linestyle='--', alpha=0.5, label='+1cm')
-            ax_err.axhline(y=-0.01, color='r', linestyle='--', alpha=0.5, label='-1cm')
-            
-            # Add text annotations with the error values
-            for i, v in enumerate(error_values):
-                # Format the text differently for the Euclidean distance (always positive)
-                if i == 3:  # Euclidean is the 4th value
-                    ax_err.annotate(f'{v:.4f}m', 
-                                  xy=(i, v), 
-                                  xytext=(0, 5),
-                                  textcoords='offset points',
-                                  ha='center', 
-                                  va='bottom')
-                else:
-                    # For X, Y, Z show just the signed error
-                    ax_err.annotate(f'{v:.4f}m', 
-                                  xy=(i, v), 
-                                  xytext=(0, 5 if v >= 0 else -25),
-                                  textcoords='offset points',
-                                  ha='center', 
-                                  va='bottom' if v >= 0 else 'top')
-            
-            ax_err.set_title('Position Error Analysis')
-            ax_err.set_ylabel('Error (m)')
-            ax_err.grid(True, axis='y')
-            
-            # Set y-axis limits to show both positive and negative errors
-            max_abs_error = max([abs(v) for v in error_values]) * 1.2  # Add 20% padding
-            ax_err.set_ylim(-max_abs_error, max_abs_error)
+            self._plot_position_error(fig, gs[1, 1], data)
             
             # Save the figure
             ee_plt_filename = f'ee_trajectory_analysis_{target_name}_{data["timestamp"]}.png'
             plt.savefig(ee_plt_filename, dpi=300, bbox_inches='tight')
             self.get_logger().info(f'Saved EE visualization to {ee_plt_filename}')
             
-            # Close the figure to avoid memory leaks and hanging windows
+            # Close the figure to avoid memory leaks
             plt.close(fig)
             
         except Exception as e:
             self.get_logger().error(f'Failed to visualize end-effector data: {str(e)}')
+    
+    def _plot_3d_trajectory(self, fig, gs_pos, data):
+        """Plot 3D trajectory of end-effector"""
+        ax_3d = fig.add_subplot(gs_pos, projection='3d')
+        ax_3d.plot(data['positions_x'], data['positions_y'], data['positions_z'], 'b-', linewidth=2)
+        ax_3d.scatter(data['positions_x'][0], data['positions_y'][0], data['positions_z'][0], 
+                      color='g', s=100, label='Start')
+        ax_3d.scatter(data['positions_x'][-1], data['positions_y'][-1], data['positions_z'][-1], 
+                      color='r', s=100, label='End')
+        
+        # Plot target position if available
+        if data['target_pose']:
+            ax_3d.scatter(data['target_pose']['x'], data['target_pose']['y'], data['target_pose']['z'],
+                        color='m', s=100, label='Target')
+            
+            # Draw line from end position to target
+            ax_3d.plot([data['positions_x'][-1], data['target_pose']['x']],
+                       [data['positions_y'][-1], data['target_pose']['y']],
+                       [data['positions_z'][-1], data['target_pose']['z']],
+                       'r--', linewidth=1.5, label='Position Error')
+        
+        ax_3d.set_title('End-Effector 3D Trajectory')
+        ax_3d.set_xlabel('X (m)')
+        ax_3d.set_ylabel('Y (m)')
+        ax_3d.set_zlabel('Z (m)')
+        ax_3d.legend()
+        
+        # Make axis equal for better visualization
+        self._set_axes_equal_3d(ax_3d, data['positions_x'], data['positions_y'], data['positions_z'])
+    
+    def _set_axes_equal_3d(self, ax, x_data, y_data, z_data):
+        """Make axes of 3D plot have equal scale"""
+        max_range = max([
+            max(x_data) - min(x_data),
+            max(y_data) - min(y_data),
+            max(z_data) - min(z_data)
+        ])
+        mid_x = (max(x_data) + min(x_data)) / 2
+        mid_y = (max(y_data) + min(y_data)) / 2
+        mid_z = (max(z_data) + min(z_data)) / 2
+        ax.set_xlim(mid_x - max_range/2, mid_x + max_range/2)
+        ax.set_ylim(mid_y - max_range/2, mid_y + max_range/2)
+        ax.set_zlim(mid_z - max_range/2, mid_z + max_range/2)
+    
+    def _plot_position_data(self, fig, gs_pos, data):
+        """Plot position data with target comparison"""
+        ax_pos = fig.add_subplot(gs_pos)
+        ax_pos.plot(data['timestamps'], data['positions_x'], 'r-', label='X')
+        ax_pos.plot(data['timestamps'], data['positions_y'], 'g-', label='Y')
+        ax_pos.plot(data['timestamps'], data['positions_z'], 'b-', label='Z')
+        
+        # Add target position lines if available
+        if data['target_pose']:
+            ax_pos.axhline(y=data['target_pose']['x'], color='r', linestyle='--', alpha=0.5, label='X Target')
+            ax_pos.axhline(y=data['target_pose']['y'], color='g', linestyle='--', alpha=0.5, label='Y Target')
+            ax_pos.axhline(y=data['target_pose']['z'], color='b', linestyle='--', alpha=0.5, label='Z Target')
+        
+        ax_pos.set_title('End-Effector Position')
+        ax_pos.set_xlabel('Time (s)')
+        ax_pos.set_ylabel('Position (m)')
+        ax_pos.grid(True)
+        ax_pos.legend()
+    
+    def _plot_velocity_data(self, fig, gs_pos, data):
+        """Plot velocity data"""
+        ax_vel = fig.add_subplot(gs_pos)
+        ax_vel.plot(data['timestamps'], data['velocities_x'], 'r-', label='X')
+        ax_vel.plot(data['timestamps'], data['velocities_y'], 'g-', label='Y')
+        ax_vel.plot(data['timestamps'], data['velocities_z'], 'b-', label='Z')
+        
+        ax_vel.set_title('End-Effector Velocity')
+        ax_vel.set_xlabel('Time (s)')
+        ax_vel.set_ylabel('Velocity (m/s)')
+        ax_vel.grid(True)
+        ax_vel.legend()
+    
+    def _plot_position_error(self, fig, gs_pos, data):
+        """Plot position error analysis"""
+        ax_err = fig.add_subplot(gs_pos)
+        
+        # Create a bar chart for position errors
+        labels = ['X Error', 'Y Error', 'Z Error', 'Euclidean']
+        error_values = [
+            data['position_error']['x'],
+            data['position_error']['y'],
+            data['position_error']['z'],
+            data['position_error']['euclidean']
+        ]
+        
+        colors = ['red', 'green', 'blue', 'purple']
+        bars = ax_err.bar(labels, error_values, color=colors, alpha=0.7)
+        
+        # Add a horizontal line at zero
+        ax_err.axhline(y=0, color='k', linestyle='-', alpha=0.3)
+        
+        # Add a horizontal line indicating a 1cm error threshold
+        ax_err.axhline(y=0.01, color='r', linestyle='--', alpha=0.5, label='+1cm')
+        ax_err.axhline(y=-0.01, color='r', linestyle='--', alpha=0.5, label='-1cm')
+        
+        # Add text annotations with the error values
+        for i, v in enumerate(error_values):
+            # Format the text differently for the Euclidean distance (always positive)
+            if i == 3:  # Euclidean
+                ax_err.annotate(f'{v:.4f}m', 
+                              xy=(i, v), 
+                              xytext=(0, 5),
+                              textcoords='offset points',
+                              ha='center', 
+                              va='bottom')
+            else:
+                # For X, Y, Z show the signed error
+                ax_err.annotate(f'{v:.4f}m', 
+                              xy=(i, v), 
+                              xytext=(0, 5 if v >= 0 else -25),
+                              textcoords='offset points',
+                              ha='center', 
+                              va='bottom' if v >= 0 else 'top')
+        
+        ax_err.set_title('Position Error Analysis')
+        ax_err.set_ylabel('Error (m)')
+        ax_err.grid(True, axis='y')
+        
+        # Set y-axis limits to show both positive and negative errors
+        max_abs_error = max([abs(v) for v in error_values]) * 1.2  # Add 20% padding
+        ax_err.set_ylim(-max_abs_error, max_abs_error)
+    
+    def _calculate_velocities(self, positions, timestamps, velocities_out):
+        """Calculate velocities from position data"""
+        if len(positions) < 2:
+            if velocities_out:
+                velocities_out.clear()
+            return
+            
+        # First point has zero velocity
+        velocities_out.append(0.0)
+        
+        # Calculate velocities using central differences where possible
+        for i in range(1, len(timestamps) - 1):
+            dt = timestamps[i + 1] - timestamps[i - 1]
+            if dt > 0 and not np.isnan(positions[i + 1]) and not np.isnan(positions[i - 1]):
+                # Central difference
+                vel = (positions[i + 1] - positions[i - 1]) / dt
+                velocities_out.append(vel)
+            else:
+                # Forward difference fallback
+                dt = timestamps[i] - timestamps[i - 1]
+                if dt > 0 and not np.isnan(positions[i]) and not np.isnan(positions[i - 1]):
+                    vel = (positions[i] - positions[i - 1]) / dt
+                else:
+                    vel = 0.0
+                velocities_out.append(vel)
+        
+        # Last point - backward difference
+        i = len(timestamps) - 1
+        if i > 0:
+            dt = timestamps[i] - timestamps[i - 1]
+            if dt > 0 and not np.isnan(positions[i]) and not np.isnan(positions[i - 1]):
+                vel = (positions[i] - positions[i - 1]) / dt
+            else:
+                vel = 0.0
+            velocities_out.append(vel)
+    
+    def _calculate_accelerations(self, velocities, timestamps, accelerations_out):
+        """Calculate accelerations from velocity data"""
+        if len(velocities) < 2:
+            if accelerations_out:
+                accelerations_out.clear()
+            return
+            
+        # First point has zero acceleration
+        accelerations_out.append(0.0)
+        
+        # Calculate accelerations using central differences where possible
+        for i in range(1, len(timestamps) - 1):
+            dt = timestamps[i + 1] - timestamps[i - 1]
+            if dt > 0:
+                # Central difference
+                accel = (velocities[i + 1] - velocities[i - 1]) / dt
+                accelerations_out.append(accel)
+            else:
+                # Forward difference fallback
+                dt = timestamps[i] - timestamps[i - 1]
+                accel = (velocities[i] - velocities[i - 1]) / dt if dt > 0 else 0.0
+                accelerations_out.append(accel)
+        
+        # Last point - backward difference
+        i = len(timestamps) - 1
+        if i > 0:
+            dt = timestamps[i] - timestamps[i - 1]
+            accel = (velocities[i] - velocities[i - 1]) / dt if dt > 0 else 0.0
+            accelerations_out.append(accel)
+    
+    def _interpolate_at_timestamps(self, target_times, source_times, source_values):
+        """Interpolate values at specific timestamps"""
+        result = []
+        
+        for time in target_times:
+            # Handle timestamps before first velocity measurement
+            if time <= source_times[0]:
+                result.append(source_values[0])
+                continue
+                
+            # Handle timestamps after last velocity measurement
+            if time >= source_times[-1]:
+                result.append(source_values[-1])
+                continue
+            
+            # Find surrounding points for interpolation
+            for i in range(len(source_times) - 1):
+                if source_times[i] <= time <= source_times[i + 1]:
+                    # Linear interpolation
+                    t = (time - source_times[i]) / (source_times[i + 1] - source_times[i])
+                    interpolated = source_values[i] * (1 - t) + source_values[i + 1] * t
+                    result.append(interpolated)
+                    break
+        
+        return result
+    
+    def _get_target_pose(self, target_frame):
+        """Get target pose from TF"""
+        try:
+            target_transform = self.tf_buffer.lookup_transform(
+                'world', 
+                target_frame,
+                rclpy.time.Time()
+            )
+            target_pose = {
+                'x': target_transform.transform.translation.x,
+                'y': target_transform.transform.translation.y,
+                'z': target_transform.transform.translation.z
+            }
+            self.get_logger().info(f"Target pose: X={target_pose['x']:.4f}, Y={target_pose['y']:.4f}, Z={target_pose['z']:.4f}")
+            return target_pose
+        except Exception as e:
+            self.get_logger().warn(f'Could not get target pose: {e}')
+            return {
+                'x': 0.0,
+                'y': 0.0,
+                'z': 0.0
+            }
+    
+    def _calculate_position_error(self, final_pos, target_pose):
+        """Calculate position error metrics"""
+        return {
+            'x': final_pos['x'] - target_pose['x'],
+            'y': final_pos['y'] - target_pose['y'],
+            'z': final_pos['z'] - target_pose['z'],
+            'euclidean': np.sqrt(
+                (final_pos['x'] - target_pose['x'])**2 +
+                (final_pos['y'] - target_pose['y'])**2 +
+                (final_pos['z'] - target_pose['z'])**2
+            )
+        }
 
 
 def main(args=None):
     rclpy.init(args=args)
-    node = DataRecorder()
-    
     try:
+        node = DataRecorder()
         rclpy.spin(node)
     except KeyboardInterrupt:
         pass
+    except Exception as e:
+        print(f"Error: {str(e)}")
     finally:
-        node.destroy_node()
         rclpy.shutdown()
 
 
