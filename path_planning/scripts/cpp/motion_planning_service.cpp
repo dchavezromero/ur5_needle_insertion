@@ -271,12 +271,12 @@ private:
     bool success = false;
     try {
       success = static_cast<bool>(move_group_->plan(plan));
-      auto end_time = this->now();
-      
-      // Calculate planning time
-      response->planning_time = (end_time - start_time).seconds();
       
       if (success) {
+        auto end_time = this->now();
+        
+        // Calculate planning time
+        response->planning_time = (end_time - start_time).seconds();
         response->success = true;
         response->message = "Motion planning succeeded";
         response->trajectory_points = static_cast<int32_t>(plan.trajectory_.joint_trajectory.points.size());
@@ -347,7 +347,7 @@ private:
       } else {
         response->success = false;
         response->message = "Motion planning failed - could not find a valid path";
-        RCLCPP_ERROR(this->get_logger(), "Planning failed after %.2f seconds", response->planning_time);
+        RCLCPP_ERROR(this->get_logger(), "Planning failed!");
       }
     }
     catch (const std::exception& e) {

@@ -115,7 +115,7 @@ def generate_launch_description():
     )
     
     # === Hospital Environment Objects ===
-    needle_gap = 0.10
+    needle_gap = 0.12
     # 1. Bedside Table
     spawn_table = Node(
         package='gazebo_ros',
@@ -184,7 +184,7 @@ def generate_launch_description():
         arguments=[
             '-file', os.path.join(hospital_models_path, "models/OpScrubs/model.sdf"),
             '-entity', 'opScrubs',
-            '-x', '0.127641', '-y', '-0.716872', '-z', '0'
+            '-x', '0.127641', '-y', '-0.816872', '-z', '0'
         ],
         output='screen'
     )
@@ -194,7 +194,7 @@ def generate_launch_description():
         executable="static_transform_publisher",
         name="surgeon_broadcaster",
         output="log",
-        arguments=["0.127641", "-0.716872", "0", "0", "0", "0", "world", "opScrubs"]
+        arguments=["0.127641", "-0.816872", "0", "0", "0", "0", "world", "opScrubs"]
     )
     
     # 5. Divider
