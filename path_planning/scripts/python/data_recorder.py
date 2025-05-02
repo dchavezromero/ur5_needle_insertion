@@ -523,9 +523,9 @@ class DataRecorder(Node):
             ax_metrics.grid(True, axis='y')
             ax_metrics.legend(loc='best')
             
-            # Save the figure
-            plt_filename = f'trajectory_analysis_{target_name}_{data["timestamp"]}.png'
-            plt.savefig(plt_filename, dpi=300, bbox_inches='tight')
+            # Save the figure as SVG
+            plt_filename = f'trajectory_analysis_{target_name}_{data["timestamp"]}.svg'
+            plt.savefig(plt_filename, bbox_inches='tight')
             self.get_logger().info(f'Saved joint visualization to {plt_filename}')
             
             # Close the figure to avoid memory leaks
@@ -566,9 +566,9 @@ class DataRecorder(Node):
             # Position error - bottom right
             self._plot_position_error(fig, gs[1, 1], data)
             
-            # Save the figure
-            ee_plt_filename = f'ee_trajectory_analysis_{target_name}_{data["timestamp"]}.png'
-            plt.savefig(ee_plt_filename, dpi=300, bbox_inches='tight')
+            # Save the figure as SVG
+            ee_plt_filename = f'ee_trajectory_analysis_{target_name}_{data["timestamp"]}.svg'
+            plt.savefig(ee_plt_filename, bbox_inches='tight')
             self.get_logger().info(f'Saved EE visualization to {ee_plt_filename}')
             
             # Close the figure to avoid memory leaks
