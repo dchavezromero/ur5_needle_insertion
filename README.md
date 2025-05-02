@@ -16,12 +16,16 @@ Ensure you have the following installed:
 - **Git** (for cloning and managing repositories)
 - **MoveIt** (for motion planning) → [Installation Guide](https://moveit.picknik.ai/main/doc/tutorials/getting_started/getting_started.html)
 - **Python 3.10**
+- **Matplotlib** (for data visualization)
+- **NumPy** (for numerical computations)
 
 ### **Install Required Dependencies**
 ```bash
 sudo apt update && sudo apt install -y \
     python3-colcon-common-extensions \
     python3-rosdep \
+    python3-numpy \
+    python3-matplotlib \
     git
 ```
 
@@ -83,8 +87,10 @@ source ~/.bashrc
 ```
 
 You may also want to source your ros humble and moveit install setup files:
+```bash
 echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc
 echo "source ~/ws_moveit/install/setup.bash" >> ~/.bashrc
+```
 
 ---
 
@@ -116,9 +122,70 @@ To launch the UR5 robot with MoveIt:
 ```bash
 ros2 launch path_planning ur5_moveit.launch.py
 ```
+
+## **7. Planning and Executing Motion**
+After launching the UR5 robot with MoveIt, you can plan and execute motion to various target frames using the provided ROS 2 service, for example:
+
+```bash
+ros2 service call /plan_motion path_planning/srv/PlanMotion "{target_frame: 'arm_insertion_point', planning_algorithm: 'STOMP', planning_timeout: 30.0, execute_plan: true}"
+```
+
+### **Service Parameters Explained**
+- **`target_frame`**: The destination frame for the needle insertion point (see available options below)
+- **`planning_algorithm`**: The motion planning algorithm to use (see options below)
+- **`planning_timeout`**: Maximum time in seconds allowed for planning before giving up
+- **`execute_plan`**: Boolean flag (true/false) that determines whether the planned trajectory should be executed after planning
+
+### **Available Target Frames**
+The following target frames are available for needle insertion:
+
+- **Torso targets**:
+  - `torso_insertion_point`
+  - `torso2_insertion_point`
+
+- **Leg targets**:
+  - `leg_insertion_point`
+  - `leg2_insertion_point`
+
+- **Arm targets**:
+  - `arm_insertion_point`
+  - `arm2_insertion_point`
+  - `arm3_insertion_point`
+
+### **Planning Algorithms**
+You can use different planning algorithms by changing the `planning_algorithm` parameter:
+
+#### **OMPL (Open Motion Planning Library) Planners**:
+- `RRTConnect` - Rapidly-exploring Random Tree Connect (default and fast)
+- `RRT` - Basic Rapidly-exploring Random Tree
+- `RRTstar` - Asymptotically optimal RRT
+- `PRM` - Probabilistic Roadmap
+- `KPIECE` - Kinematic Planning by Interior-Exterior Cell Exploration
+- `BKPIECE` - Bidirectional KPIECE
+- `EST` - Expanding Space Trees
+- `LBKPIECE` - Lazy Bidirectional KPIECE
+- `STRIDE` - Search Tree with Resolution Independent Density Estimation
+
+#### **Other Planners**:
+- `CHOMP` - Covariant Hamiltonian Optimization for Motion Planning
+- `STOMP` - Stochastic Trajectory Optimization for Motion Planning
+- `PILQR` - Path Integral Linear Quadratic Regulator (if available)
+
+### **Data Recording**
+Motion data is automatically recorded during execution and saved as SVG vector graphics files in the **directory from which the launch file was executed**. These visualizations include:
+
+- Joint trajectory analysis (positions, velocities, accelerations)
+- End-effector trajectory in 3D
+- Position error analysis
+- Velocity profiles
+
+Example files generated:
+- `trajectory_analysis_[target_name]_[timestamp].svg`
+- `ee_trajectory_analysis_[target_name]_[timestamp].svg`
+
 ---
 
-## **7. Updating the Repository**
+## **8. Updating the Repository**
 To update your repository and pull changes from GitHub:
 ```bash
 cd ~/ros2_ws/src/ur5_needle_insertion
@@ -134,7 +201,7 @@ git pull origin humble  # Fetch the latest updates from the upstream repo
 
 ---
 
-## **8. Contributing**
+## **9. Contributing**
 If you want to contribute:
 1. **Fork the repository**
 2. **Create a feature branch**:
