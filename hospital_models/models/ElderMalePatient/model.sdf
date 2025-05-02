@@ -123,7 +123,7 @@
     </joint> 
 
     <link name="torso2_insertion_point">
-      <pose>-0.15 -0.1 0.975 0 0 0</pose>
+      <pose>-0.2 -0.1 0.975 0 0 0</pose>
 
       <visual name="visual">
         <geometry>

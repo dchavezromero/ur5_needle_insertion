@@ -220,7 +220,7 @@ def generate_launch_description():
         executable="static_transform_publisher",
         name="torso2_insertion_broadcaster",
         output="log",
-        arguments=[str(-0.15), str(-0.1), str(0.975 + needle_gap), str(0.0), str(3.14), str(0.0), "elderMalePatient", "torso2_insertion_point"]
+        arguments=[str(-0.2), str(-0.1), str(0.975 + needle_gap), str(0.0), str(3.14), str(0.0), "elderMalePatient", "torso2_insertion_point"]
     )
     
     # Arm insertion point
