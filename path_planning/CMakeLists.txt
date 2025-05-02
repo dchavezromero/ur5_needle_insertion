@@ -10,33 +10,68 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(moveit_ros_planning_interface REQUIRED)
 find_package(ament_cmake_python REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
+find_package(std_srvs REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
 
-# uncomment the following section in order to fill in
-# further dependencies manually.
-# find_package(<dependency> REQUIRED)
+# Generate custom services
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "srv/PlanMotion.srv"
+  "srv/StartRecording.srv"
+  DEPENDENCIES std_msgs
+)
+
+# Add custom service dependencies to executables
+rosidl_get_typesupport_target(cpp_typesupport_target
+  ${PROJECT_NAME} rosidl_typesupport_cpp)
+
+# Install directories
 install(DIRECTORY launch worlds
   DESTINATION share/${PROJECT_NAME})
 
 # Install Python scripts
 install(PROGRAMS
   scripts/python/collision_publisher.py
+  scripts/python/data_recorder.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
-add_executable(move_ur5 scripts/cpp/move_ur5.cpp)
-ament_target_dependencies(move_ur5 
+# Create motion planning service
+add_executable(motion_planning_service scripts/cpp/motion_planning_service.cpp)
+ament_target_dependencies(motion_planning_service 
   rclcpp 
   moveit_ros_planning_interface
+  std_srvs
+  tf2_ros
+  tf2_geometry_msgs
 )
+target_link_libraries(motion_planning_service "${cpp_typesupport_target}")
 
-add_executable(data_recorder scripts/cpp/data_recorder.cpp)
-ament_target_dependencies(data_recorder
-  rclcpp
-  moveit_ros_planning_interface
-)
-install(TARGETS move_ur5 data_recorder
+# Install executables
+install(TARGETS 
+  motion_planning_service
   DESTINATION lib/${PROJECT_NAME}
 )
+
+# Add the ee_velocity_tracker executable
+add_executable(ee_velocity_tracker
+  scripts/cpp/ee_velocity_tracker.cpp
+)
+ament_target_dependencies(ee_velocity_tracker
+  rclcpp
+  sensor_msgs
+  geometry_msgs
+  tf2_ros
+  tf2_geometry_msgs
+)
+
+# Install the executable
+install(TARGETS
+  ee_velocity_tracker
+  DESTINATION lib/${PROJECT_NAME}/
+)
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   # the following line skips the linter which checks for copyrights
