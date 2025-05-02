@@ -32,6 +32,7 @@ install(DIRECTORY launch worlds
 # Install Python scripts
 install(PROGRAMS
   scripts/python/collision_publisher.py
+  scripts/python/data_recorder.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -46,16 +47,8 @@ ament_target_dependencies(motion_planning_service
 )
 target_link_libraries(motion_planning_service "${cpp_typesupport_target}")
 
-
-add_executable(data_recorder scripts/cpp/data_recorder.cpp)
-ament_target_dependencies(data_recorder
-  rclcpp
-  moveit_ros_planning_interface
-)
-
 # Install executables
 install(TARGETS 
-  data_recorder
   motion_planning_service
   DESTINATION lib/${PROJECT_NAME}
 )

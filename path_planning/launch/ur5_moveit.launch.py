@@ -289,7 +289,7 @@ def generate_launch_description():
 
     data_recorder = Node(
         package='path_planning',
-        executable='data_recorder',
+        executable='data_recorder.py',
         name='data_recorder',
         output='screen'
     )
