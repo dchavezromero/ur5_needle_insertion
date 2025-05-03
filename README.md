@@ -127,7 +127,7 @@ ros2 launch path_planning ur5_moveit.launch.py
 After launching the UR5 robot with MoveIt, you can plan and execute motion to various target frames using the provided ROS 2 service, for example:
 
 ```bash
-ros2 service call /plan_motion path_planning/srv/PlanMotion "{target_frame: 'arm_insertion_point', planning_algorithm: 'STOMP', planning_timeout: 30.0, execute_plan: true}"
+ros2 service call /plan_motion path_planning/srv/PlanMotion "{target_frame: 'arm_insertion_point', planning_algorithm: 'CHOMP', planning_timeout: 30.0, execute_plan: true}"
 ```
 
 ### **Service Parameters Explained**
@@ -155,21 +155,11 @@ The following target frames are available for needle insertion:
 ### **Planning Algorithms**
 You can use different planning algorithms by changing the `planning_algorithm` parameter:
 
-#### **OMPL (Open Motion Planning Library) Planners**:
+#### **OMPL (Open Motion Planning Library) Planner**:
 - `RRTConnect` - Rapidly-exploring Random Tree Connect (default and fast)
-- `RRT` - Basic Rapidly-exploring Random Tree
-- `RRTstar` - Asymptotically optimal RRT
-- `PRM` - Probabilistic Roadmap
-- `KPIECE` - Kinematic Planning by Interior-Exterior Cell Exploration
-- `BKPIECE` - Bidirectional KPIECE
-- `EST` - Expanding Space Trees
-- `LBKPIECE` - Lazy Bidirectional KPIECE
-- `STRIDE` - Search Tree with Resolution Independent Density Estimation
 
-#### **Other Planners**:
+#### **Other Planner**:
 - `CHOMP` - Covariant Hamiltonian Optimization for Motion Planning
-- `STOMP` - Stochastic Trajectory Optimization for Motion Planning
-- `PILQR` - Path Integral Linear Quadratic Regulator (if available)
 
 ### **Data Recording**
 Motion data is automatically recorded during execution and saved as SVG vector graphics files in the **directory from which the launch file was executed**. These visualizations include:

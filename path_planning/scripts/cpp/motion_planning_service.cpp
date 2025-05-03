@@ -260,8 +260,118 @@ private:
     move_group_->setGoalPositionTolerance(0.001);     // [m]
     move_group_->setGoalJointTolerance(0.001);        // [rad]
     
-    // Set the pose target
+    // Set the pose target first - we won't use IK but will use direct joint space planning
     move_group_->setPoseTarget(target_pose);
+    
+    // For CHOMP and direct joint space planning
+    if (request->planning_algorithm.find("chomp") != std::string::npos) {
+        RCLCPP_INFO(this->get_logger(), "Using CHOMP with joint space planning");
+        
+        // Use pre-computed joint values based on the target frame
+        std::vector<double> target_joint_values;
+        
+        // Assign joint values based on the specific target frame
+        if (request->target_frame.find("arm_insertion_point") != std::string::npos) {
+            target_joint_values = {
+                0.5930457323661482,
+                -0.7102523576493684,
+                1.6511490439206007,
+                5.341491401749094,
+                -4.118177589951044,
+                -1.570306374596358
+            };
+            RCLCPP_INFO(this->get_logger(), "Using pre-computed joint values for arm insertion");
+        } 
+        else if (request->target_frame.find("arm2_insertion_point") != std::string::npos) {
+            target_joint_values = {
+                0.45477366517698137,
+                -0.8281119282118299,
+                1.4478501292318153,
+                5.663518571418122,
+                2.026286053974479,
+                4.713144834252451
+            };
+            RCLCPP_INFO(this->get_logger(), "Using pre-computed joint values for arm2 insertion");
+        }
+        else if (request->target_frame.find("arm3_insertion_point") != std::string::npos) {
+            target_joint_values = {
+                4.11346539437121,
+                -2.5644903742860192,
+                -1.1788129137075618,
+                -2.5381053589499247,
+                -0.597802557065402,
+                4.711504512485698
+            };
+            RCLCPP_INFO(this->get_logger(), "Using pre-computed joint values for arm3 insertion");
+        }
+        else if (request->target_frame.find("torso_insertion_point") != std::string::npos) {
+            target_joint_values = {
+                0.219776430679282,
+                -0.28094817854693677,
+                0.048448934318947146,
+                -1.33799248477429,
+                -1.5726841796760902,
+                -2.9211925116343584
+            };
+            RCLCPP_INFO(this->get_logger(), "Using pre-computed joint values for torso insertion");
+        }
+        else if (request->target_frame.find("torso2_insertion_point") != std::string::npos) {
+            target_joint_values = {
+                0.10640885822639135,
+                0.04082699718156402,
+                -0.5789176279036106,
+                -1.0333778336216017,
+                -1.5727574339750867,
+                3.2474043108164374
+            };
+            RCLCPP_INFO(this->get_logger(), "Using pre-computed joint values for torso2 insertion");
+        }
+        else if (request->target_frame.find("leg_insertion_point") != std::string::npos) {
+            target_joint_values = {
+                2.9726181627828723,
+                -2.6308110906607363,
+                -0.7656662081640127,
+                -1.315657794058425,
+                -4.714451990369679,
+                -3.309916614332046
+            };
+            RCLCPP_INFO(this->get_logger(), "Using pre-computed joint values for leg insertion");
+        }
+        else if (request->target_frame.find("leg2_insertion_point") != std::string::npos) {
+            target_joint_values = {
+                -0.610703063493224,
+                -0.6537349343637677,
+                1.518634702836665,
+                -0.8653173051456253,
+                0.9616603709752511,
+                -1.5712588289740754
+            };
+            RCLCPP_INFO(this->get_logger(), "Using pre-computed joint values for leg2 insertion");
+        }
+        else {
+            // Use current joint values if target frame is not recognized
+            target_joint_values = current_joint_values;
+            RCLCPP_WARN(this->get_logger(), "Unrecognized target frame, using current joint values");
+        }
+        
+        // Output the joint values we're using
+        std::stringstream ss;
+        ss << "Target joint values: [";
+        for (size_t i = 0; i < target_joint_values.size(); ++i) {
+            ss << target_joint_values[i];
+            if (i < target_joint_values.size() - 1) {
+                ss << ", ";
+            }
+        }
+        ss << "]";
+        RCLCPP_INFO(this->get_logger(), "%s", ss.str().c_str());
+        
+        // Set the joint target values directly
+        move_group_->setJointValueTarget(target_joint_values);
+    } else {
+        RCLCPP_INFO(this->get_logger(), "Using pose target with planner: %s", 
+                    request->planning_algorithm.c_str());
+    }
     
     // Plan the motion
     auto start_time = this->now();
