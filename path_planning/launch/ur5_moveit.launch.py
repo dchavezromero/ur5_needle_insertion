@@ -27,7 +27,7 @@ def generate_launch_description():
         .planning_scene_monitor(
             publish_robot_description=True, publish_robot_description_semantic=True
         )
-        .planning_pipelines(pipelines=["ompl"])
+        .planning_pipelines(pipelines=["ompl", "chomp"])
         .to_moveit_configs()
     )
     
@@ -336,7 +336,8 @@ def generate_launch_description():
         arm3_insertion_tf,
         leg_insertion_tf,
         leg2_insertion_tf,
-        # Planning & Control
+        
+        #Planning & Control
         run_move_group_node,
         ros2_control_node,
         joint_state_broadcaster_spawner,
@@ -347,7 +348,7 @@ def generate_launch_description():
         
         # Collision Detection
         collision_publisher,
-        velocity_tracker,
-        data_recorder,
-        motion_planning_service
+        #velocity_tracker,
+        #data_recorder,
+        #motion_planning_service
     ])

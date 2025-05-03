@@ -239,7 +239,6 @@ private:
     // Configure the planning pipeline
     RCLCPP_INFO(this->get_logger(), "Planning with algorithm %s and timeout %.1f seconds",
                request->planning_algorithm.c_str(), request->planning_timeout);
-    
     // Update the start state manually
     moveit::core::RobotStatePtr start_state(new moveit::core::RobotState(move_group_->getRobotModel()));
     start_state->setToDefaultValues();

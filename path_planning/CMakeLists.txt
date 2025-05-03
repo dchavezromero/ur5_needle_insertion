@@ -14,6 +14,7 @@ find_package(rosidl_default_generators REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
+find_package(moveit_planners_chomp REQUIRED)
 
 # Generate custom services
 rosidl_generate_interfaces(${PROJECT_NAME}
