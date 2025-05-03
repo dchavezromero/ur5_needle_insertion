@@ -249,7 +249,17 @@ private:
     
     move_group_->setStartState(*start_state);
     
-    move_group_->setPlannerId(request->planning_algorithm);
+    // Set the appropriate planner ID based on the request
+    if (request->planning_algorithm.find("chomp") != std::string::npos) {
+        // Ensure we're using the full CHOMP planner ID with the group
+        move_group_->setPlanningPipelineId("chomp");
+        RCLCPP_INFO(this->get_logger(), "Using CHOMP planner with ID: %s", move_group_->getPlannerId().c_str());
+    } else {
+        // Use the requested planner for other algorithms (e.g., OMPL)
+        move_group_->setPlanningPipelineId("ompl");
+        RCLCPP_INFO(this->get_logger(), "Using planner with ID: %s", move_group_->getPlannerId().c_str());
+    }
+    
     move_group_->setPlanningTime(request->planning_timeout);
     move_group_->setNumPlanningAttempts(3);
     move_group_->setMaxVelocityScalingFactor(0.5);

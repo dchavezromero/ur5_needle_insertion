@@ -6,12 +6,12 @@ request_adapters: >-
   default_planner_request_adapters/FixStartStateCollision
   default_planner_request_adapters/FixStartStatePathConstraints
 start_state_max_bounds_error: 0.1
-planning_time_limit: 10.0
-max_iterations: 200
+planning_time_limit: 30.0
+max_iterations: 5200
 max_iterations_after_collision_free: 5
-smoothness_cost_weight: 0.1
-obstacle_cost_weight: 1.0
-learning_rate: 0.01
+smoothness_cost_weight: 0.2
+obstacle_cost_weight: 0.5
+learning_rate: 0.05
 animate_path: true
 add_randomness: false
 smoothness_cost_velocity: 0.0
@@ -25,12 +25,11 @@ ridge_factor: 0.0
 use_pseudo_inverse: false
 pseudo_inverse_ridge_factor: 1e-4
 animate_endeffector: false
-animate_endeffector_segment: "panda_rightfinger"
 joint_update_limit: 0.1
-collision_clearance: 0.001
-collision_threshold: 0.07
+collision_clearance: 0.0005  # Reduced from 0.001
+collision_threshold: 3.0     # Increased from 0.07 to allow higher collision costs
 random_jump_amount: 1.0
 use_stochastic_descent: true
-enable_failure_recovery: false
+enable_failure_recovery: true
 max_recovery_attempts: 5
 trajectory_initialization_method: "quintic-spline"
